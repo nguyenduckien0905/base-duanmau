@@ -18,6 +18,5 @@ spl_autoload_register(function ($class) {
 
 require_once './configs/env.php';
 require_once './configs/helper.php';
-
 // Điều hướng
 require_once './routes/index.php';
