@@ -6,4 +6,5 @@ class HomeController
     {
         require_once PATH_VIEW . 'PATH_VIEW_MAIN';
     }
+    
 }
