@@ -21,7 +21,7 @@ $flash = getFlash();
     <!-- Khung đăng nhập ở giữa màn hình. -->
     <div class="login-card">
         <div class="login-brand">
-            <span class="brand-mark">CS</span>
+            <img style="width: 60px;" src="assets/uploads/admin/logo.jpg" alt="Logo">
             <div>
                 <h1>Clothing Shop</h1>
                 <p>Đăng nhập khu vực quản trị</p>
@@ -55,7 +55,7 @@ $flash = getFlash();
                     type="email"
                     name="email"
                     value="<?= e($_POST['email'] ?? '') ?>"
-                    placeholder="admin@shop.local"
+                    placeholder="Nhập email"
                     required
                     autofocus
                 >
@@ -78,9 +78,9 @@ $flash = getFlash();
         </form>
 
         <!-- Tài khoản có sẵn trong file demo SQL. -->
-        <div class="login-demo">
+        <!-- <div class="login-demo">
             <strong>Tài khoản demo</strong>
-            <span>admin@shop.local / Admin@123</span>
+            <span>admin@shop.local / Admin@123</span> -->
         </div>
     </div>
 </body>
