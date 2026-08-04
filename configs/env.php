@@ -1,6 +1,6 @@
 <?php
 
-define('BASE_URL',          'http://localhost/BaseExam/');
+define('BASE_URL',          'http://localhost/base-duanmau/');
 
 define('PATH_ROOT',         __DIR__ . '/../');
 
@@ -15,12 +15,19 @@ define('PATH_ASSETS_UPLOADS',   PATH_ROOT . 'assets/uploads/');
 define('PATH_CONTROLLER',       PATH_ROOT . 'controllers/');
 
 define('PATH_MODEL',            PATH_ROOT . 'models/');
+// Đường dẫn tới layout chính của phần Client.
+define('PATH_VIEW_CLIENT_MAIN', PATH_VIEW . 'client/layouts/master.php');
+// Đường dẫn đến controller Client; dùng để nạp HomeController và ProductController.
+define('PATH_CONTROLLER_CLIENT', PATH_CONTROLLER . 'client/');
+// Đường dẫn đến model Client; tách riêng model đọc dữ liệu cho người mua.
+define('PATH_MODEL_CLIENT', PATH_MODEL . 'client/');
+
 
 define('DB_HOST',     'localhost');
 define('DB_PORT',     '3306');
 define('DB_USERNAME', 'root');
 define('DB_PASSWORD', '');
-define('DB_NAME',     '');
+define('DB_NAME','shop_ban_quan_ao');
 define('DB_OPTIONS', [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
