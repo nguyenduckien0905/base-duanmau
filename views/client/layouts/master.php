@@ -7,7 +7,7 @@
     <!-- Giúp giao diện co giãn đúng trên điện thoại và máy tính bảng. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- $pageTitle được controller truyền sang; e() giúp chống chèn mã HTML. -->
-    <title><?= e($pageTitle ?? 'K Fashion') ?> | K Fashion</title>
+   <title><?= e($pageTitle ?? 'KD Fashion') ?> | KD Fashion</title>
     <!-- Nạp file CSS riêng của giao diện Client. -->
    <link
     rel="stylesheet"

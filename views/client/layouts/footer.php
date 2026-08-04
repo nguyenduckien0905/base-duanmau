@@ -4,7 +4,7 @@
         <!-- Chia nội dung footer thành ba cột trên màn hình lớn. -->
         <div class="footer-grid">
             <div>
-                <h3>K FASHION</h3>
+                <h3>KD FASHION</h3>
                 <p>Thời trang trẻ trung, dễ phối và phù hợp với phong cách mỗi ngày.</p>
             </div>
             <div>
@@ -19,6 +19,6 @@
             </div>
         </div>
         <!-- date('Y') luôn hiển thị năm hiện tại theo cấu hình múi giờ. -->
-        <div class="copyright">© <?= date('Y') ?> K Fashion. All rights reserved.</div>
+        <div class="copyright">© <?= date('Y') ?> KD Fashion. All rights reserved.</div>
     </div>
 </footer>

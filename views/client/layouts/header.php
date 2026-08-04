@@ -7,13 +7,9 @@
 <header class="site-header">
     <div class="container header-inner">
         <!-- Logo -->
-        <a
-            class="logo"
-            href="<?= e(url('/')) ?>"
-        >
-            K<span>FASHION</span>
+        <a class="logo" href="<?= e(url('/')) ?>">
+        KD<span>FASHION</span>
         </a>
-
         <!-- Menu điều hướng -->
         <nav class="nav">
     <!-- Trang chủ -->

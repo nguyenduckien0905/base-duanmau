@@ -3,7 +3,7 @@
         <!-- Phần giới thiệu bên trái -->
         <div class="auth-banner">
             <a class="auth-logo" href="<?= e(url('/')) ?>">
-                K<span>FASHION</span>
+                KD<span>FASHION</span>
             </a>
 
             <div class="auth-banner-content">
