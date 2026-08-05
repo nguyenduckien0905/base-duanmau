@@ -12,6 +12,7 @@
 
         <select name="category_id">
             <option value="">Tất cả danh mục</option>
+
             <?php foreach ($categories as $category): ?>
                 <option
                     value="<?= e($category['category_id']) ?>"
@@ -40,11 +41,13 @@
                     <th>Danh mục</th>
                     <th>Thương hiệu</th>
                     <th>Giá</th>
-                    <th>Tồn kho</th>
+                    <th>Biến thể</th>
+                    <th>Tổng tồn kho</th>
                     <th>Trạng thái</th>
                     <th class="text-right">Thao tác</th>
                 </tr>
             </thead>
+
             <tbody>
                 <?php foreach ($products as $product): ?>
                     <tr>
@@ -66,19 +69,29 @@
                                 </div>
                             </div>
                         </td>
+
                         <td><?= e($product['category_name']) ?></td>
                         <td><?= e($product['brand_name'] ?? 'Không có') ?></td>
                         <td><strong><?= e(formatPrice($product['price'])) ?></strong></td>
+
                         <td>
-                            <span class="<?= (int) $product['stock'] <= 10 ? 'stock-low' : '' ?>">
-                                <?= e($product['stock']) ?>
+                            <span class="badge badge-info">
+                                <?= e($product['variant_count']) ?> biến thể
                             </span>
                         </td>
+
+                        <td>
+                            <strong class="<?= (int) $product['total_stock'] <= 10 ? 'stock-low' : '' ?>">
+                                <?= e($product['total_stock']) ?>
+                            </strong>
+                        </td>
+
                         <td>
                             <span class="badge <?= (int) $product['status'] === 1 ? 'badge-success' : 'badge-muted' ?>">
                                 <?= (int) $product['status'] === 1 ? 'Đang bán' : 'Đang ẩn' ?>
                             </span>
                         </td>
+
                         <td class="actions">
                             <a
                                 class="btn btn-light btn-small"
@@ -93,7 +106,10 @@
                                 data-confirm="Bạn có chắc muốn xóa sản phẩm này?"
                             >
                                 <?= csrfField() ?>
-                                <button class="btn btn-danger btn-small" type="submit">Xóa</button>
+
+                                <button class="btn btn-danger btn-small" type="submit">
+                                    Xóa
+                                </button>
                             </form>
                         </td>
                     </tr>
@@ -101,7 +117,9 @@
 
                 <?php if (empty($products)): ?>
                     <tr>
-                        <td colspan="7" class="empty-state">Không tìm thấy sản phẩm.</td>
+                        <td colspan="8" class="empty-state">
+                            Không tìm thấy sản phẩm.
+                        </td>
                     </tr>
                 <?php endif; ?>
             </tbody>

@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Controller CRUD sản phẩm.
+ * Controller CRUD sản phẩm và biến thể màu - size.
  */
 class AdminProductController extends AdminBaseController
 {
@@ -20,6 +20,7 @@ class AdminProductController extends AdminBaseController
     public function __construct()
     {
         parent::__construct();
+
         $this->model = new ProductModel();
         $this->categoryModel = new CategoryModel();
         $this->brandModel = new BrandModel();
@@ -49,31 +50,56 @@ class AdminProductController extends AdminBaseController
      */
     public function create(): void
     {
-        // Tạo bộ dữ liệu mặc định cho form.
+        // Dữ liệu sản phẩm mặc định.
         $product = $this->emptyProduct();
+
+        // Form mới luôn có sẵn một dòng biến thể trống.
+        $variants = [
+            [
+                'color' => '',
+                'size' => '',
+                'stock' => 0,
+            ],
+        ];
+
+        // Mảng chứa lỗi kiểm tra dữ liệu.
         $errors = [];
 
-        // Xử lý dữ liệu POST.
+        // Xử lý dữ liệu khi người dùng gửi form.
         if (isPost()) {
             verifyCsrf();
 
-            // Chuẩn hóa dữ liệu từ form.
+            // Lấy thông tin chung của sản phẩm.
             $product = $this->productDataFromRequest($product);
 
-            // Kiểm tra các trường quan trọng.
-            $errors = $this->validateProduct($product);
+            // Lấy danh sách các tổ hợp màu - size.
+            $variants = $this->variantsFromRequest();
 
+            // Kiểm tra cả sản phẩm và biến thể.
+            $errors = array_merge(
+                $this->validateProduct($product),
+                $this->validateVariants($variants)
+            );
+
+            // Chỉ lưu khi dữ liệu hợp lệ.
             if (empty($errors)) {
                 try {
-                    // Ảnh sản phẩm không bắt buộc.
+                    // Upload ảnh sản phẩm nếu người dùng đã chọn ảnh.
                     $product['image'] = uploadImage('image');
-                    $this->model->create($product);
 
-                    setFlash('success', 'Thêm sản phẩm thành công.');
+                    // Model lưu sản phẩm và biến thể trong một transaction.
+                    $this->model->createWithVariants($product, $variants);
+
+                    setFlash('success', 'Thêm sản phẩm và biến thể thành công.');
                     redirect('admin/products');
                 } catch (Throwable $exception) {
+                    // Xóa ảnh mới nếu database không lưu được.
                     deleteUploadedImage($product['image']);
-                    $errors[] = 'Không thể thêm sản phẩm.';
+
+                    // Ghi lỗi thật vào Apache log để lập trình viên kiểm tra.
+                    error_log($exception->getMessage());
+
+                    $errors[] = 'Không thể thêm sản phẩm. Vui lòng kiểm tra lại biến thể.';
                 }
             }
         }
@@ -82,6 +108,7 @@ class AdminProductController extends AdminBaseController
         $this->renderProductForm(
             'Thêm sản phẩm',
             $product,
+            $variants,
             $errors,
             url('admin/products/create')
         );
@@ -92,49 +119,83 @@ class AdminProductController extends AdminBaseController
      */
     public function edit(): void
     {
-        // Tìm sản phẩm theo id.
+        // Lấy id từ URL và tìm sản phẩm.
         $id = (int) ($_GET['id'] ?? 0);
         $product = $this->model->find($id);
 
+        // Trả 404 khi sản phẩm không tồn tại.
         if (!$product) {
             abort404();
             return;
         }
 
+        // Lấy các biến thể hiện tại của sản phẩm.
+        $variants = $this->model->getVariants($id);
+
+        // Nếu sản phẩm cũ chưa có biến thể thì hiển thị một dòng trống.
+        if (empty($variants)) {
+            $variants = [
+                [
+                    'color' => '',
+                    'size' => '',
+                    'stock' => 0,
+                ],
+            ];
+        }
+
         // Lưu ảnh cũ để dùng khi người dùng không đổi ảnh.
         $oldImage = $product['image'];
+
+        // Mảng lỗi mặc định.
         $errors = [];
 
-        // Xử lý dữ liệu POST.
+        // Xử lý form POST.
         if (isPost()) {
             verifyCsrf();
 
+            // Lấy lại dữ liệu mới từ form.
             $product = $this->productDataFromRequest($product);
-            $errors = $this->validateProduct($product);
+            $variants = $this->variantsFromRequest();
+
+            // Kiểm tra dữ liệu.
+            $errors = array_merge(
+                $this->validateProduct($product),
+                $this->validateVariants($variants)
+            );
 
             if (empty($errors)) {
                 $newImage = null;
 
                 try {
-                    // Upload ảnh mới nếu người dùng đã chọn file.
+                    // Upload ảnh mới nếu có.
                     $newImage = uploadImage('image');
+
+                    // Nếu không có ảnh mới thì tiếp tục sử dụng ảnh cũ.
                     $product['image'] = $newImage ?: $oldImage;
 
-                    // Cập nhật database.
-                    $this->model->update($id, $product);
+                    // Cập nhật sản phẩm và biến thể trong một transaction.
+                    $this->model->updateWithVariants(
+                        $id,
+                        $product,
+                        $variants
+                    );
 
-                    // Xóa ảnh cũ sau khi cập nhật thành công.
+                    // Chỉ xóa ảnh cũ sau khi database cập nhật thành công.
                     if ($newImage) {
                         deleteUploadedImage($oldImage);
                     }
 
-                    setFlash('success', 'Cập nhật sản phẩm thành công.');
+                    setFlash('success', 'Cập nhật sản phẩm và biến thể thành công.');
                     redirect('admin/products');
                 } catch (Throwable $exception) {
+                    // Xóa ảnh vừa upload nếu cập nhật database thất bại.
                     if ($newImage) {
                         deleteUploadedImage($newImage);
                     }
-                    $errors[] = 'Không thể cập nhật sản phẩm.';
+
+                    error_log($exception->getMessage());
+
+                    $errors[] = 'Không thể cập nhật sản phẩm. Vui lòng kiểm tra lại biến thể.';
                 }
             }
         }
@@ -143,6 +204,7 @@ class AdminProductController extends AdminBaseController
         $this->renderProductForm(
             'Sửa sản phẩm',
             $product,
+            $variants,
             $errors,
             url('admin/products/edit', ['id' => $id])
         );
@@ -171,11 +233,15 @@ class AdminProductController extends AdminBaseController
         }
 
         try {
-            // Xóa bản ghi và ảnh liên quan.
+            // product_variants tự bị xóa nhờ ON DELETE CASCADE.
             $this->model->delete($id);
+
+            // Xóa ảnh sau khi xóa database thành công.
             deleteUploadedImage($product['image']);
+
             setFlash('success', 'Xóa sản phẩm thành công.');
         } catch (Throwable $exception) {
+            error_log($exception->getMessage());
             setFlash('error', 'Không thể xóa sản phẩm.');
         }
 
@@ -183,7 +249,7 @@ class AdminProductController extends AdminBaseController
     }
 
     /**
-     * Trả bộ dữ liệu mặc định của một sản phẩm mới.
+     * Trả bộ dữ liệu mặc định của sản phẩm mới.
      */
     private function emptyProduct(): array
     {
@@ -193,9 +259,6 @@ class AdminProductController extends AdminBaseController
             'product_name' => '',
             'description' => '',
             'material' => '',
-            'color' => '',
-            'size' => '',
-            'stock' => 0,
             'price' => 0,
             'image' => null,
             'status' => 1,
@@ -203,41 +266,70 @@ class AdminProductController extends AdminBaseController
     }
 
     /**
-     * Lấy dữ liệu sản phẩm từ request POST.
+     * Lấy thông tin chung của sản phẩm từ POST.
      */
     private function productDataFromRequest(array $product): array
     {
-        // Chỉ trả đúng các cột model cần để PDO không nhận tham số thừa.
+        // Không lấy color, size và stock từ products nữa.
         return [
-            // Ép kiểu số cho khóa ngoại.
             'category_id' => (int) ($_POST['category_id'] ?? 0),
             'brand_id' => (int) ($_POST['brand_id'] ?? 0) ?: null,
-
-            // Làm sạch khoảng trắng ở các chuỗi.
             'product_name' => trim((string) ($_POST['product_name'] ?? '')),
             'description' => trim((string) ($_POST['description'] ?? '')),
             'material' => trim((string) ($_POST['material'] ?? '')),
-            'color' => trim((string) ($_POST['color'] ?? '')),
-            'size' => trim((string) ($_POST['size'] ?? '')),
-
-            // Không cho tồn kho và giá nhận số âm.
-            'stock' => max(0, (int) ($_POST['stock'] ?? 0)),
             'price' => max(0, (float) ($_POST['price'] ?? 0)),
-
-            // Giữ ảnh hiện tại cho đến khi upload được ảnh mới.
             'image' => $product['image'] ?? null,
-
-            // Checkbox được chọn tương ứng status bằng 1.
             'status' => isset($_POST['status']) ? 1 : 0,
         ];
     }
 
     /**
-     * Kiểm tra dữ liệu sản phẩm.
+     * Lấy các dòng biến thể từ form.
+     */
+    private function variantsFromRequest(): array
+    {
+        // Mỗi mảng dùng cùng chỉ số để tạo một tổ hợp.
+        $colors = (array) ($_POST['variant_color'] ?? []);
+        $sizes = (array) ($_POST['variant_size'] ?? []);
+        $stocks = (array) ($_POST['variant_stock'] ?? []);
+
+        // Số dòng lớn nhất được gửi từ form.
+        $rowCount = max(
+            count($colors),
+            count($sizes),
+            count($stocks)
+        );
+
+        // Danh sách kết quả.
+        $variants = [];
+
+        // Ghép màu, size và tồn kho theo cùng một chỉ số.
+        for ($index = 0; $index < $rowCount; $index++) {
+            $color = trim((string) ($colors[$index] ?? ''));
+            $size = trim((string) ($sizes[$index] ?? ''));
+            $stockText = trim((string) ($stocks[$index] ?? '0'));
+
+            // Bỏ qua dòng hoàn toàn trống.
+            if ($color === '' && $size === '' && $stockText === '') {
+                continue;
+            }
+
+            // Giữ dòng chưa đầy đủ để validate hiển thị lỗi chính xác.
+            $variants[] = [
+                'color' => $color,
+                'size' => $size,
+                'stock' => max(0, (int) $stockText),
+            ];
+        }
+
+        return $variants;
+    }
+
+    /**
+     * Kiểm tra thông tin chung của sản phẩm.
      */
     private function validateProduct(array $product): array
     {
-        // Khởi tạo danh sách lỗi.
         $errors = [];
 
         if ($product['product_name'] === '') {
@@ -256,21 +348,132 @@ class AdminProductController extends AdminBaseController
     }
 
     /**
-     * Nạp form sản phẩm với các danh sách lựa chọn.
+     * Kiểm tra các tổ hợp màu - size.
+     */
+    private function validateVariants(array $variants): array
+    {
+        // Mảng chứa lỗi kiểm tra dữ liệu.
+        $errors = [];
+
+        // Mảng dùng để phát hiện tổ hợp màu - size bị trùng.
+        $usedCombinations = [];
+
+        // Lấy danh sách màu và kích thước hợp lệ.
+        $allowedColors = $this->colorOptions();
+        $allowedSizes = $this->sizeOptions();
+
+        // Mỗi sản phẩm phải có ít nhất một biến thể.
+        if (empty($variants)) {
+            return ['Vui lòng thêm ít nhất một biến thể sản phẩm.'];
+        }
+
+        foreach ($variants as $index => $variant) {
+            // Số dòng hiển thị cho người dùng bắt đầu từ 1.
+            $rowNumber = $index + 1;
+
+            // Kiểm tra màu sắc bắt buộc và phải nằm trong select cho phép.
+            if ($variant['color'] === '') {
+                $errors[] = "Biến thể dòng {$rowNumber} chưa chọn màu sắc.";
+            } elseif (!in_array($variant['color'], $allowedColors, true)) {
+                $errors[] = "Màu sắc ở dòng {$rowNumber} không hợp lệ.";
+            }
+
+            // Kiểm tra kích thước bắt buộc và phải nằm trong select cho phép.
+            if ($variant['size'] === '') {
+                $errors[] = "Biến thể dòng {$rowNumber} chưa chọn kích thước.";
+            } elseif (!in_array($variant['size'], $allowedSizes, true)) {
+                $errors[] = "Kích thước ở dòng {$rowNumber} không hợp lệ.";
+            }
+
+            // Chỉ kiểm tra trùng khi cả màu và size đã được chọn.
+            if ($variant['color'] !== '' && $variant['size'] !== '') {
+                // Tạo khóa đại diện cho một tổ hợp màu - size.
+                $combinationKey = $variant['color'] . '|' . $variant['size'];
+
+                // Báo lỗi nếu tổ hợp này đã xuất hiện ở dòng trước.
+                if (isset($usedCombinations[$combinationKey])) {
+                    $errors[] = 'Biến thể '
+                        . $variant['color']
+                        . ' - '
+                        . $variant['size']
+                        . ' bị trùng.';
+                }
+
+                // Đánh dấu tổ hợp đã được sử dụng.
+                $usedCombinations[$combinationKey] = true;
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Danh sách màu sắc nhân viên được phép chọn.
+     */
+    private function colorOptions(): array
+    {
+        return [
+            'Đen',
+            'Trắng',
+            'Xám',
+            'Đỏ',
+            'Xanh dương',
+            'Xanh navy',
+            'Xanh lá',
+            'Vàng',
+            'Cam',
+            'Hồng',
+            'Tím',
+            'Nâu',
+            'Be',
+        ];
+    }
+
+    /**
+     * Danh sách kích thước nhân viên được phép chọn.
+     */
+    private function sizeOptions(): array
+    {
+        return [
+            'Freesize',
+            'XS',
+            'S',
+            'M',
+            'L',
+            'XL',
+            'XXL',
+            '28',
+            '29',
+            '30',
+            '31',
+            '32',
+            '33',
+            '34',
+            '35',
+            '36',
+        ];
+    }
+
+    /**
+     * Hiển thị form sản phẩm cùng các danh sách lựa chọn.
      */
     private function renderProductForm(
         string $pageTitle,
         array $product,
+        array $variants,
         array $errors,
         string $formAction
     ): void {
         $this->render('admin/products/form', [
             'pageTitle' => $pageTitle,
             'product' => $product,
+            'variants' => $variants,
             'errors' => $errors,
             'formAction' => $formAction,
             'categories' => $this->categoryModel->getOptions(),
             'brands' => $this->brandModel->getOptions(),
+            'colorOptions' => $this->colorOptions(),
+            'sizeOptions' => $this->sizeOptions(),
         ]);
     }
 }

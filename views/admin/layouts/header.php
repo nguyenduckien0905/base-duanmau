@@ -10,9 +10,19 @@
     <!-- Tiêu đề trình duyệt thay đổi theo trang. -->
     <title><?= e($pageTitle ?? 'Admin') ?> | Clothing Shop</title>
 
-    <!-- Nạp CSS riêng của trang quản trị. -->
-    <link rel="stylesheet" href="<?= e(BASE_URL . 'assets/css/admin.css') ?>">
+    <!-- Nạp CSS chính của trang quản trị. -->
+    <link
+        rel="stylesheet"
+        href="<?= e(BASE_URL . 'assets/css/admin.css') ?>"
+    >
+
+    <!-- Nạp CSS dành riêng cho form biến thể sản phẩm. -->
+    <link
+        rel="stylesheet"
+        href="<?= e(BASE_URL . 'assets/css/admin-variants.css') ?>"
+    >
 </head>
+
 <body>
     <!-- Khung bao toàn bộ sidebar và nội dung. -->
     <div class="admin-shell">

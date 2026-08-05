@@ -10,9 +10,11 @@ $isActive = static function (string $prefix) use ($currentAction): string {
 <aside class="admin-sidebar">
     <!-- Logo của khu vực quản trị. -->
     <a class="brand" href="<?= e(url('admin/dashboard')) ?>">
-        <span class="brand-mark">CS</span>
+        <span class="brand-mark">
+            <img style="width: 50px;" src="./assets/uploads/logo_KD.png" alt="logo thương hiệu">
+        </span>
         <span>
-            <strong>Clothing Shop</strong>
+            <strong>K.D Fashion </strong>
             <small>ADMIN PANEL</small>
         </span>
     </a>

@@ -1,0 +1,50 @@
+/* Khung chứa phần biến thể sản phẩm. */
+.variant-box {
+    margin: 8px 0 22px;
+    padding: 20px;
+    border: 1px solid var(--line, #e7eaf1);
+    border-radius: 12px;
+    background: #fafbfe;
+}
+
+/* Tiêu đề và nút thêm biến thể. */
+.variant-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.variant-heading h2,
+.variant-heading p {
+    margin: 0;
+}
+
+.variant-heading h2 {
+    font-size: 17px;
+}
+
+.variant-heading p {
+    margin-top: 4px;
+    color: var(--muted, #718096);
+}
+
+/* Không cho input và select trong bảng quá hẹp. */
+.variant-table input,
+.variant-table select {
+    min-width: 130px;
+}
+
+.variant-table td:last-child {
+    width: 100px;
+    text-align: right;
+}
+
+/* Responsive cho màn hình nhỏ. */
+@media (max-width: 760px) {
+    .variant-heading {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}
