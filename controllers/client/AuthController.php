@@ -470,3 +470,27 @@ class AuthController
         require PATH_VIEW_CLIENT_MAIN;
     }
 }
+function delete(){
+    $form = [
+            'fullname' => trim(
+                (string) (
+                    $_POST['fullname']
+                    ?? $user['fullname']
+                )
+            ),
+
+            'phone' => trim(
+                (string) (
+                    $_POST['phone']
+                    ?? ($user['phone'] ?? '')
+                )
+            ),
+
+            'address' => trim(
+                (string) (
+                    $_POST['address']
+                    ?? ($client['address'] ?? '')
+                )
+            ),
+        ];
+}
