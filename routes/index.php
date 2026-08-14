@@ -30,6 +30,11 @@ match ($action) {
     'checkout' => (new ClientOrderController())->checkout(),
     'orders' => (new ClientOrderController())->history(),
     'orders/show' => (new ClientOrderController())->show(),
+    'orders/confirm-received' =>
+        (new OrderController())->confirmReceived(),
+    'reviews/create' =>
+        (new ReviewController())->create(),
+
 
     // Action không tồn tại sẽ trả lỗi 404.
     default => abort404(),
