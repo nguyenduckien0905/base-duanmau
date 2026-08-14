@@ -44,7 +44,8 @@ class ClientAuthModel extends BaseModel
         // role_id = 3 giúp tài khoản mới xuất hiện trong nhóm khách hàng ở Admin.
        $sql = 'INSERT INTO users (
             role_id,fullname, email, password,phone, avatar, status )
-             VALUES (3, :fullname, :email, :password, :phone, NULL,  1)';
+             VALUES (
+             3, :fullname, :email, :password, :phone, NULL,  1)';
         // Chạy INSERT và trả số dòng được thêm.
         return $this->execute($sql, $data);
     }

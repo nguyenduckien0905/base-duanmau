@@ -1,122 +1,169 @@
 <?php
 
-/**
- * Model tạo và đọc đơn hàng phía Client.
- * Các bảng orders, order_items và payments cũng được AdminOrderController đọc.
- */
 class ClientOrderModel extends BaseModel
 {
-    /**
-     * Tạo đơn hàng, chi tiết đơn và thanh toán trong cùng một transaction.
-     */
+    public function previewCoupon(string $code, float $subtotal): array
+    {
+        $coupon = $this->first(
+            'SELECT * FROM coupons WHERE UPPER(code) = :code LIMIT 1',
+            ['code' => strtoupper(trim($code))]
+        );
+        return $this->validateAndCalculateCoupon($coupon, $subtotal);
+    }
+
     public function createOrder(array $order, array $items): int
     {
-        // Lấy phương thức thanh toán ra riêng vì cột này thuộc bảng payments.
-        $paymentMethod = $order['payment_method'];
+        $paymentMethod = (string) ($order['payment_method'] ?? 'cod');
+        $paymentProof = $order['payment_proof'] ?? null;
+        $couponCode = strtoupper(trim((string) ($order['coupon_code'] ?? '')));
+        unset($order['payment_method'], $order['payment_proof'], $order['coupon_code']);
 
-        // Xóa phần tử thừa để PDO chỉ nhận placeholder có trong INSERT orders.
-        unset($order['payment_method']);
+        if ($paymentMethod === 'bank_transfer' && empty($paymentProof)) {
+            throw new DomainException('Vui lòng tải ảnh minh chứng khi thanh toán chuyển khoản.');
+        }
 
-        // Transaction bảo đảm không tạo đơn thiếu sản phẩm hoặc thiếu thanh toán.
+        $subtotal = 0.0;
+        foreach ($items as $item) {
+            $subtotal += (float) $item['price'] * (int) $item['quantity'];
+        }
+        $shippingFee = $subtotal >= 500000 ? 0.0 : 30000.0;
+
         $this->pdo->beginTransaction();
 
         try {
-            // Chuẩn bị câu lệnh thêm thông tin chung của đơn hàng.
-            $statement = $this->pdo->prepare(
-                'INSERT INTO orders (
-                    user_id, receiver_name, receiver_phone, shipping_address,
-                    note, subtotal, shipping_fee, discount, total_price, status
-                 ) VALUES (
-                    :user_id, :receiver_name, :receiver_phone, :shipping_address,
-                    :note, :subtotal, :shipping_fee, :discount, :total_price, :status
-                 )'
-            );
+            $couponId = null;
+            $discount = 0.0;
 
-            // Gửi dữ liệu đơn hàng vào câu SQL bằng prepared statement.
-            $statement->execute($order);
-
-            // Lấy id của đơn hàng vừa được tạo.
-            $orderId = (int) $this->pdo->lastInsertId();
-
-            // Chuẩn bị câu lệnh thêm từng sản phẩm vào bảng order_items.
-            $itemStatement = $this->pdo->prepare(
-                'INSERT INTO order_items (
-                    order_id, product_id, product_name,
-                    size, color, price, quantity
-                 ) VALUES (
-                    :order_id, :product_id, :product_name,
-                    :size, :color, :price, :quantity
-                 )'
-            );
-
-            // Lặp giỏ hàng để lưu ảnh chụp tên, giá, phân loại tại lúc đặt hàng.
-            foreach ($items as $item) {
-                // Gắn order_id mới tạo vào từng dòng chi tiết.
-                $item['order_id'] = $orderId;
-
-                // Thêm dòng chi tiết đơn hàng.
-                $itemStatement->execute($item);
-
-                // Trừ tồn kho nhưng không bao giờ để stock nhỏ hơn 0.
-                $stockStatement = $this->pdo->prepare(
-                    'UPDATE products
-                     SET stock = stock - :quantity
-                     WHERE product_id = :product_id
-                       AND stock >= :quantity'
+            if ($couponCode !== '') {
+                $couponStatement = $this->pdo->prepare(
+                    'SELECT * FROM coupons
+                     WHERE UPPER(code) = :code LIMIT 1 FOR UPDATE'
                 );
+                $couponStatement->execute(['code' => $couponCode]);
+                $coupon = $couponStatement->fetch();
+                $coupon = $coupon === false ? null : $coupon;
+                $couponResult = $this->validateAndCalculateCoupon($coupon, $subtotal);
+                $couponId = (int) $couponResult['coupon']['coupon_id'];
+                $discount = (float) $couponResult['discount'];
 
-                // Chạy cập nhật tồn kho theo số lượng khách đã mua.
-                $stockStatement->execute([
-                    'quantity' => $item['quantity'],
-                    'product_id' => $item['product_id'],
-                ]);
-
-                // Nếu tồn kho thay đổi 0 dòng thì dữ liệu giỏ đã không còn hợp lệ.
-                if ($stockStatement->rowCount() !== 1) {
-                    throw new DomainException(
-                        'Sản phẩm “' . $item['product_name'] . '” không đủ tồn kho.'
-                    );
+                $couponUpdate = $this->pdo->prepare(
+                    'UPDATE coupons SET quantity = quantity - 1
+                     WHERE coupon_id = :coupon_id AND quantity > 0'
+                );
+                $couponUpdate->execute(['coupon_id' => $couponId]);
+                if ($couponUpdate->rowCount() !== 1) {
+                    throw new DomainException('Mã giảm giá đã hết lượt sử dụng.');
                 }
             }
 
-            // Tạo bản ghi thanh toán để Admin hiển thị phương thức và trạng thái.
-            $paymentStatement = $this->pdo->prepare(
-                'INSERT INTO payments (order_id, method, status, transaction_id)
-                 VALUES (:order_id, :method, :status, NULL)'
-            );
+            $order['coupon_id'] = $couponId;
+            $order['subtotal'] = $subtotal;
+            $order['shipping_fee'] = $shippingFee;
+            $order['discount'] = $discount;
+            $order['total_price'] = max(0, $subtotal + $shippingFee - $discount);
+            $order['status'] = 'pending';
 
-            // COD và chuyển khoản đều bắt đầu ở trạng thái chưa thanh toán.
+            $orderStatement = $this->pdo->prepare(
+                'INSERT INTO orders (
+                    user_id, coupon_id, receiver_name, receiver_phone,
+                    shipping_address, note, subtotal, shipping_fee,
+                    discount, total_price, status
+                 ) VALUES (
+                    :user_id, :coupon_id, :receiver_name, :receiver_phone,
+                    :shipping_address, :note, :subtotal, :shipping_fee,
+                    :discount, :total_price, :status
+                 )'
+            );
+            $orderStatement->execute($order);
+            $orderId = (int) $this->pdo->lastInsertId();
+
+            $stockStatement = $this->pdo->prepare(
+                'UPDATE product_variants
+                 INNER JOIN products ON products.product_id = product_variants.product_id
+                 SET product_variants.stock = product_variants.stock - :quantity_decrement
+                 WHERE product_variants.variant_id = :variant_id
+                   AND product_variants.product_id = :product_id
+                   AND product_variants.status = 1
+                   AND products.status = 1
+                   AND product_variants.stock >= :quantity_check'
+            );
+            $itemStatement = $this->pdo->prepare(
+                'INSERT INTO order_items (
+                    order_id, product_id, variant_id, product_name,
+                    size, color, price, quantity
+                 ) VALUES (
+                    :order_id, :product_id, :variant_id, :product_name,
+                    :size, :color, :price, :quantity
+                 )'
+            );
+            $affectedProductIds = [];
+
+            foreach ($items as $item) {
+                $stockStatement->execute([
+                    'quantity_decrement' => $item['quantity'],
+                    'quantity_check' => $item['quantity'],
+                    'variant_id' => $item['variant_id'],
+                    'product_id' => $item['product_id'],
+                ]);
+                if ($stockStatement->rowCount() !== 1) {
+                    throw new DomainException(
+                        'Phân loại ' . $item['color'] . ' - ' . $item['size']
+                        . ' của sản phẩm “' . $item['product_name'] . '” không đủ tồn kho.'
+                    );
+                }
+                $item['order_id'] = $orderId;
+                $itemStatement->execute($item);
+                $affectedProductIds[(int) $item['product_id']] = true;
+            }
+
+            $totalStockStatement = $this->pdo->prepare(
+                'UPDATE products SET stock = (
+                    SELECT COALESCE(SUM(product_variants.stock), 0)
+                    FROM product_variants
+                    WHERE product_variants.product_id = products.product_id
+                      AND product_variants.status = 1
+                 ) WHERE product_id = :product_id'
+            );
+            foreach (array_keys($affectedProductIds) as $productId) {
+                $totalStockStatement->execute(['product_id' => $productId]);
+            }
+
+            $paymentStatement = $this->pdo->prepare(
+                'INSERT INTO payments (
+                    order_id, method, transaction_id, proof_image,
+                    proof_uploaded_at, status
+                 ) VALUES (
+                    :order_id, :method, NULL, :proof_image,
+                    :proof_uploaded_at, :status
+                 )'
+            );
             $paymentStatement->execute([
                 'order_id' => $orderId,
                 'method' => $paymentMethod,
-                'status' => 'unpaid',
+                'proof_image' => $paymentMethod === 'bank_transfer' ? $paymentProof : null,
+                'proof_uploaded_at' => $paymentMethod === 'bank_transfer'
+                    ? date('Y-m-d H:i:s') : null,
+                'status' => 'pending',
             ]);
 
-            // Xác nhận tất cả thay đổi khi không có lỗi.
             $this->pdo->commit();
-
-            // Trả id để controller chuyển sang trang đặt hàng thành công.
             return $orderId;
         } catch (Throwable $exception) {
-            // Hoàn tác toàn bộ INSERT và UPDATE khi có bất kỳ lỗi nào.
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
-
-            // Ném lỗi ra controller để hiển thị thông báo.
             throw $exception;
         }
     }
 
-    /**
-     * Lấy lịch sử đơn của đúng khách hàng đang đăng nhập.
-     */
     public function getByUser(int $userId): array
     {
         return $this->all(
-            'SELECT orders.*, payments.method AS payment_method,
+            'SELECT orders.*, coupons.code AS coupon_code,
+                    payments.method AS payment_method,
                     payments.status AS payment_status
              FROM orders
+             LEFT JOIN coupons ON coupons.coupon_id = orders.coupon_id
              LEFT JOIN payments ON payments.order_id = orders.order_id
              WHERE orders.user_id = :user_id
              ORDER BY orders.created_at DESC',
@@ -124,30 +171,112 @@ class ClientOrderModel extends BaseModel
         );
     }
 
-    /**
-     * Lấy một đơn hàng và kiểm tra đơn đó thuộc đúng khách hàng.
-     */
     public function findForUser(int $orderId, int $userId): ?array
     {
         return $this->first(
-            'SELECT orders.*, payments.method AS payment_method,
-                    payments.status AS payment_status
+            'SELECT orders.*, coupons.code AS coupon_code,
+                    payments.method AS payment_method,
+                    payments.status AS payment_status,
+                    payments.proof_image, payments.proof_uploaded_at,
+                    payments.admin_note
              FROM orders
+             LEFT JOIN coupons ON coupons.coupon_id = orders.coupon_id
              LEFT JOIN payments ON payments.order_id = orders.order_id
-             WHERE orders.order_id = :order_id
-               AND orders.user_id = :user_id',
+             WHERE orders.order_id = :order_id AND orders.user_id = :user_id',
             ['order_id' => $orderId, 'user_id' => $userId]
         );
     }
 
-    /**
-     * Lấy sản phẩm thuộc một đơn hàng.
-     */
-    public function getItems(int $orderId): array
+    public function getItems(int $orderId, int $userId): array
     {
         return $this->all(
-            'SELECT * FROM order_items WHERE order_id = :order_id',
-            ['order_id' => $orderId]
+            'SELECT order_items.*, reviews.review_id,
+                    reviews.rating AS review_rating,
+                    reviews.comment AS review_comment
+             FROM order_items
+             LEFT JOIN reviews
+                ON reviews.user_id = :user_id
+               AND reviews.product_id = order_items.product_id
+             WHERE order_items.order_id = :order_id
+             ORDER BY order_items.order_item_id ASC',
+            ['order_id' => $orderId, 'user_id' => $userId]
         );
+    }
+
+    public function confirmReceived(int $orderId, int $userId): void
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $statement = $this->pdo->prepare(
+                'UPDATE orders
+                 SET status = :completed, completed_at = CURRENT_TIMESTAMP
+                 WHERE order_id = :order_id AND user_id = :user_id
+                   AND status = :delivered'
+            );
+            $statement->execute([
+                'completed' => 'completed',
+                'delivered' => 'delivered',
+                'order_id' => $orderId,
+                'user_id' => $userId,
+            ]);
+            if ($statement->rowCount() !== 1) {
+                throw new DomainException(
+                    'Đơn hàng chưa ở trạng thái đã giao hoặc đã được xác nhận.'
+                );
+            }
+
+            $paymentStatement = $this->pdo->prepare(
+                'UPDATE payments
+                 SET status = :paid,
+                     paid_at = COALESCE(paid_at, CURRENT_TIMESTAMP),
+                     verified_at = COALESCE(verified_at, CURRENT_TIMESTAMP)
+                 WHERE order_id = :order_id AND method = :cod'
+            );
+            $paymentStatement->execute([
+                'paid' => 'paid',
+                'order_id' => $orderId,
+                'cod' => 'cod',
+            ]);
+            $this->pdo->commit();
+        } catch (Throwable $exception) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $exception;
+        }
+    }
+
+    private function validateAndCalculateCoupon(?array $coupon, float $subtotal): array
+    {
+        if (!$coupon || (int) $coupon['status'] !== 1) {
+            throw new DomainException('Mã giảm giá không tồn tại hoặc đã bị tắt.');
+        }
+        $now = time();
+        if ($now < strtotime($coupon['start_date']) || $now > strtotime($coupon['end_date'])) {
+            throw new DomainException('Mã giảm giá chưa bắt đầu hoặc đã hết hạn.');
+        }
+        if ((int) $coupon['quantity'] <= 0) {
+            throw new DomainException('Mã giảm giá đã hết lượt sử dụng.');
+        }
+        if ($subtotal < (float) $coupon['min_order_value']) {
+            throw new DomainException(
+                'Đơn hàng cần tối thiểu ' . formatPrice($coupon['min_order_value'])
+                . ' để dùng mã này.'
+            );
+        }
+
+        if ($coupon['discount_type'] === 'percent') {
+            $discount = $subtotal * (float) $coupon['discount_value'] / 100;
+            if ($coupon['max_discount'] !== null) {
+                $discount = min($discount, (float) $coupon['max_discount']);
+            }
+        } else {
+            $discount = (float) $coupon['discount_value'];
+        }
+
+        return [
+            'coupon' => $coupon,
+            'discount' => min($subtotal, round($discount, 2)),
+        ];
     }
 }

@@ -1,137 +1,203 @@
 <?php
 
 /**
- * File được đặt tại models/client/ProductModel.php.
- * Tên class là ClientProductModel để không trùng với ProductModel của Admin.
- * Model Client chỉ đọc dữ liệu; việc thêm, sửa, xóa vẫn do Admin xử lý.
+ * Model đọc sản phẩm và biến thể cho khu vực khách hàng.
+ *
+ * Admin quản lý tồn kho theo từng dòng trong product_variants. Vì vậy Client
+ * không dùng products.color, products.size hoặc products.stock để quyết định
+ * khách có thể mua gì.
  */
 class ClientProductModel extends BaseModel
 {
     /**
      * Lấy danh sách sản phẩm cho trang Client.
-     *
-     * @param string $keyword Từ khóa tìm theo tên sản phẩm.
-     * @param int $categoryId Mã danh mục cần lọc; 0 nghĩa là lấy tất cả.
-     * @param string $sort Kiểu sắp xếp được chọn trên giao diện.
      */
     public function getAll(
         string $keyword = '',
         int $categoryId = 0,
-        string $sort = 'newest'
+        string $sort = 'newest',
+        int $limit = 12,
+        int $offset = 0
     ): array {
-        // SELECT products.* lấy toàn bộ cột của bảng products.
-        // INNER JOIN categories lấy tên danh mục và chỉ nhận sản phẩm có danh mục.
-        // LEFT JOIN brands vẫn nhận sản phẩm dù sản phẩm chưa có thương hiệu.
-        // status = 1 bảo đảm Client chỉ thấy sản phẩm được phép bán.
-        $sql = 'SELECT products.*, categories.name AS category_name,
-                       brands.brand_name
-                FROM products
-                INNER JOIN categories ON categories.category_id = products.category_id
-                LEFT JOIN brands ON brands.brand_id = products.brand_id
-                WHERE products.status = 1';
+        $limit = max(1, min($limit, 100));
+        $offset = max(0, $offset);
 
-        // Mảng chứa các giá trị sẽ bind vào placeholder của câu SQL.
-        $params = [];
+        [$whereSql, $params] = $this->productFilters(
+            $keyword,
+            $categoryId
+        );
 
-        // Chỉ thêm điều kiện tìm tên khi người dùng có nhập từ khóa.
-        if ($keyword !== '') {
-            // LIKE kết hợp hai dấu % cho phép tìm từ khóa ở bất kỳ vị trí nào.
-            $sql .= ' AND products.product_name LIKE :keyword';
+        $sql = $this->productSelect() . ' ' . $whereSql;
 
-            // Không nối trực tiếp dữ liệu vào SQL để hạn chế SQL Injection.
-            $params['keyword'] = '%' . $keyword . '%';
-        }
-
-        // categoryId bằng 0 nghĩa là người dùng chọn "Tất cả danh mục".
-        if ($categoryId > 0) {
-            // Thêm điều kiện lọc đúng category_id được chọn.
-            $sql .= ' AND products.category_id = :category_id';
-
-            // Gán dữ liệu cho placeholder :category_id.
-            $params['category_id'] = $categoryId;
-        }
-
-        // match chọn chính xác đoạn ORDER BY tương ứng với lựa chọn sắp xếp.
         $sql .= match ($sort) {
-            // Giá từ thấp đến cao.
             'price_asc' => ' ORDER BY products.price ASC',
-            // Giá từ cao xuống thấp.
             'price_desc' => ' ORDER BY products.price DESC',
-            // Tên sản phẩm theo bảng chữ cái A đến Z.
             'name_asc' => ' ORDER BY products.product_name ASC',
-            // Mặc định id lớn hơn (sản phẩm thêm sau) hiển thị trước.
             default => ' ORDER BY products.product_id DESC',
         };
 
-        // BaseModel::all() chạy SQL và trả về nhiều dòng dạng mảng.
-        return $this->all($sql, $params);
+        // Database chỉ trả đúng 12 sản phẩm của trang hiện tại.
+        $sql .= ' LIMIT ' . $limit . ' OFFSET ' . $offset;
+
+        return $this->normalizeProductRows(
+            $this->all($sql, $params)
+        );
     }
 
     /**
-     * Lấy một số sản phẩm mới để hiển thị trên trang chủ.
+     * Đếm tổng sản phẩm đang bán theo điều kiện tìm kiếm và danh mục.
+     */
+    public function countAll(string $keyword = '', int $categoryId = 0): int
+    {
+        [$whereSql, $params] = $this->productFilters(
+            $keyword,
+            $categoryId
+        );
+
+        $result = $this->first(
+            'SELECT COUNT(*) AS total
+             FROM products
+             INNER JOIN categories
+                ON categories.category_id = products.category_id
+             ' . $whereSql,
+            $params
+        );
+
+        return (int) ($result['total'] ?? 0);
+    }
+
+    /**
+     * Lấy sản phẩm mới cho trang chủ.
      */
     public function getFeatured(int $limit = 8): array
     {
-        // Giới hạn từ 1 đến 20 để tránh đưa giá trị LIMIT quá lớn vào SQL.
         $limit = max(1, min($limit, 20));
 
-        // Trả các sản phẩm đang bán theo thứ tự mới nhất.
-        return $this->all(
-            'SELECT products.*, categories.name AS category_name,
-                    brands.brand_name
-             FROM products
-             INNER JOIN categories ON categories.category_id = products.category_id
-             LEFT JOIN brands ON brands.brand_id = products.brand_id
-             WHERE products.status = 1
-             ORDER BY products.product_id DESC
-             LIMIT ' . $limit
+        return $this->normalizeProductRows(
+            $this->all(
+                $this->productSelect()
+                . ' WHERE products.status = 1
+                    ORDER BY products.product_id DESC
+                    LIMIT ' . $limit
+            )
         );
     }
 
     /**
-     * Tìm một sản phẩm đang được phép bán theo khóa chính.
+     * Tìm một sản phẩm đang được phép bán.
      */
     public function find(int $id): ?array
     {
-        // BaseModel::first() trả một dòng; không tìm thấy thì trả null.
-        return $this->first(
-            'SELECT products.*, categories.name AS category_name,
-                    brands.brand_name
-             FROM products
-             INNER JOIN categories ON categories.category_id = products.category_id
-             LEFT JOIN brands ON brands.brand_id = products.brand_id
-             WHERE products.product_id = :id AND products.status = 1',
-            // Bind id vào :id thay vì nối trực tiếp vào câu SQL.
+        $product = $this->first(
+            $this->productSelect()
+            . ' WHERE products.product_id = :id
+                  AND products.status = 1',
             ['id' => $id]
+        );
+
+        return $this->normalizeProduct($product);
+    }
+
+    /**
+     * Lấy sản phẩm cùng danh mục.
+     */
+    public function getRelated(
+        int $categoryId,
+        int $exceptId,
+        int $limit = 4
+    ): array {
+        $limit = max(1, min($limit, 8));
+
+        return $this->normalizeProductRows(
+            $this->all(
+                $this->productSelect()
+                . ' WHERE products.status = 1
+                      AND products.category_id = :category_id
+                      AND products.product_id != :except_id
+                    ORDER BY products.product_id DESC
+                    LIMIT ' . $limit,
+                [
+                    'category_id' => $categoryId,
+                    'except_id' => $exceptId,
+                ]
+            )
         );
     }
 
     /**
-     * Lấy sản phẩm cùng danh mục để gợi ý ở cuối trang chi tiết.
+     * Lấy các biến thể đang hoạt động của một sản phẩm.
+     *
+     * Biến thể hết hàng vẫn được trả về để trang chi tiết có thể thông báo rõ
+     * tổ hợp nào đã hết, nhưng form mua chỉ cho chọn dòng có stock > 0.
      */
-    public function getRelated(int $categoryId, int $exceptId, int $limit = 4): array
+    public function getVariants(int $productId): array
     {
-        // Chỉ cho phép lấy từ 1 đến 8 sản phẩm liên quan.
-        $limit = max(1, min($limit, 8));
-
-        // Truy vấn sản phẩm cùng category_id nhưng khác product_id đang xem.
         return $this->all(
-            'SELECT products.*, categories.name AS category_name,
-                    brands.brand_name
-             FROM products
-             INNER JOIN categories ON categories.category_id = products.category_id
-             LEFT JOIN brands ON brands.brand_id = products.brand_id
-             WHERE products.status = 1
-               AND products.category_id = :category_id
-               AND products.product_id != :except_id
-             ORDER BY products.product_id DESC
-             LIMIT ' . $limit,
-            // Mảng dữ liệu được bind vào hai placeholder trong SQL.
+            'SELECT variant_id, product_id, color, size, stock, status
+             FROM product_variants
+             WHERE product_id = :product_id
+               AND status = 1
+             ORDER BY color ASC, size ASC, variant_id ASC',
+            ['product_id' => $productId]
+        );
+    }
+
+    /**
+     * Đọc đúng một biến thể có thể bán kèm thông tin sản phẩm hiện tại.
+     */
+    public function findPurchasableVariant(
+        int $variantId,
+        int $productId = 0
+    ): ?array {
+        $sql = 'SELECT
+                    product_variants.variant_id,
+                    product_variants.product_id,
+                    product_variants.color,
+                    product_variants.size,
+                    product_variants.stock,
+                    product_variants.status AS variant_status,
+                    products.product_name,
+                    products.image,
+                    products.price,
+                    products.status AS product_status
+                FROM product_variants
+                INNER JOIN products
+                    ON products.product_id = product_variants.product_id
+                WHERE product_variants.variant_id = :variant_id
+                  AND product_variants.status = 1
+                  AND products.status = 1';
+
+        $params = ['variant_id' => $variantId];
+
+        // Khi thêm giỏ, điều kiện này ngăn việc ghép variant của sản phẩm khác.
+        if ($productId > 0) {
+            $sql .= ' AND product_variants.product_id = :product_id';
+            $params['product_id'] = $productId;
+        }
+
+        return $this->first($sql, $params);
+    }
+
+    /**
+     * Hỗ trợ chuyển giỏ session cũ sang variant_id sau khi nâng cấp Client.
+     */
+    public function findVariantByAttributes(
+        int $productId,
+        string $color,
+        string $size
+    ): ?array {
+        return $this->first(
+            'SELECT variant_id
+             FROM product_variants
+             WHERE product_id = :product_id
+               AND color = :color
+               AND size = :size
+               AND status = 1
+             LIMIT 1',
             [
-                // Danh mục của sản phẩm đang xem.
-                'category_id' => $categoryId,
-                // Id cần loại trừ để sản phẩm không tự gợi ý chính nó.
-                'except_id' => $exceptId,
+                'product_id' => $productId,
+                'color' => $color,
+                'size' => $size,
             ]
         );
     }
@@ -141,12 +207,85 @@ class ClientProductModel extends BaseModel
      */
     public function getCategories(): array
     {
-        // Chỉ lấy hai cột cần dùng và sắp xếp tên A–Z.
         return $this->all(
             'SELECT category_id, name
              FROM categories
              WHERE status = 1
              ORDER BY name ASC'
         );
+    }
+
+    /**
+     * Phần SELECT dùng chung.
+     *
+     * variant_stock là tổng tồn thực trong product_variants. Hàm normalize sẽ
+     * đưa giá trị này về khóa stock để các view cũ vẫn hoạt động.
+     */
+    private function productSelect(): string
+    {
+        return 'SELECT
+                    products.*,
+                    categories.name AS category_name,
+                    brands.brand_name,
+                    COALESCE((
+                        SELECT SUM(product_variants.stock)
+                        FROM product_variants
+                        WHERE product_variants.product_id = products.product_id
+                          AND product_variants.status = 1
+                    ), 0) AS variant_stock
+                FROM products
+                INNER JOIN categories
+                    ON categories.category_id = products.category_id
+                LEFT JOIN brands
+                    ON brands.brand_id = products.brand_id';
+    }
+
+    /**
+     * Chuẩn hóa một sản phẩm để stock luôn là tổng kho biến thể.
+     */
+    private function normalizeProduct(?array $product): ?array
+    {
+        if ($product === null) {
+            return null;
+        }
+
+        $product['stock'] = (int) ($product['variant_stock'] ?? 0);
+        unset($product['variant_stock']);
+
+        return $product;
+    }
+
+    /**
+     * Chuẩn hóa danh sách sản phẩm.
+     */
+    private function normalizeProductRows(array $products): array
+    {
+        return array_map(
+            fn(array $product): array => $this->normalizeProduct($product),
+            $products
+        );
+    }
+
+    /**
+     * Điều kiện dùng chung cho SELECT danh sách và SELECT COUNT.
+     */
+    private function productFilters(
+        string $keyword,
+        int $categoryId
+    ): array {
+        $whereSql = 'WHERE products.status = 1';
+        $params = [];
+
+        if ($keyword !== '') {
+            $whereSql .= ' AND products.product_name LIKE :keyword';
+            $params['keyword'] = '%' . $keyword . '%';
+        }
+
+        if ($categoryId > 0) {
+            $whereSql .= ' AND products.category_id = :category_id';
+            $params['category_id'] = $categoryId;
+        }
+
+        return [$whereSql, $params];
     }
 }

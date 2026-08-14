@@ -4,7 +4,7 @@
         <div class="section-heading">
             <div>
                 <h1>Đơn hàng của tôi</h1>
-                <p>Theo dõi tình trạng các đơn hàng đã đặt.</p>
+                <p>Theo dõi thanh toán, giao hàng và xác nhận đã nhận.</p>
             </div>
         </div>
 
@@ -20,13 +20,16 @@
                             <span class="status-pill status-<?= e($order['status']) ?>">
                                 <?= e(orderStatusText($order['status'])) ?>
                             </span>
+                            <small class="order-payment-text">
+                                <?= e(paymentStatusText($order['payment_status'] ?? null)) ?>
+                            </small>
                         </div>
                         <div>
                             <span>Tổng tiền</span>
                             <strong class="product-price"><?= e(formatPrice($order['total_price'])) ?></strong>
                         </div>
                         <a class="btn btn-light" href="<?= e(url('orders/show', ['id' => $order['order_id']])) ?>">
-                            Xem chi tiết
+                            <?= $order['status'] === 'delivered' ? 'Xác nhận nhận hàng' : 'Xem chi tiết' ?>
                         </a>
                     </article>
                 <?php endforeach; ?>

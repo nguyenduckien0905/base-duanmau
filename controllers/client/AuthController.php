@@ -467,6 +467,6 @@ class AuthController
             PATH_VIEW . 'client/account/profile.php';
 
         // Nạp layout Client.
-        require PATH_VIEW_CLIENT_MAIN;
+        require PATH_VIEW . 'client/layouts/master.php';
     }
 }

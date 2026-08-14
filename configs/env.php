@@ -15,8 +15,7 @@ define('PATH_ASSETS_UPLOADS',   PATH_ROOT . 'assets/uploads/');
 define('PATH_CONTROLLER',       PATH_ROOT . 'controllers/');
 
 define('PATH_MODEL',            PATH_ROOT . 'models/');
-// Đường dẫn tới layout chính của phần Client.
-define('PATH_VIEW_CLIENT_MAIN', PATH_VIEW . 'client/layouts/master.php');
+
 // Đường dẫn đến controller Client; dùng để nạp HomeController và ProductController.
 define('PATH_CONTROLLER_CLIENT', PATH_CONTROLLER . 'client/');
 // Đường dẫn đến model Client; tách riêng model đọc dữ liệu cho người mua.

@@ -17,6 +17,14 @@
         . filemtime(PATH_ROOT . 'assets/css/client.css')
     ) ?>"
 >
+    <link
+        rel="stylesheet"
+        href="<?= e(
+            BASE_URL
+            . 'assets/css/checkout-workflow.css?v='
+            . filemtime(PATH_ROOT . 'assets/css/checkout-workflow.css')
+        ) ?>"
+    >
 </head>
 <body>
     <!-- Nạp phần đầu trang dùng chung: logo, menu và ô tìm kiếm. -->

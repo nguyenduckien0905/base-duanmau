@@ -30,6 +30,6 @@ class HomeController
         $contentView = PATH_VIEW . 'client/home/index.php';
 
         // Nạp layout chung; layout sẽ nạp header, contentView và footer.
-        require PATH_VIEW_CLIENT_MAIN;
+        require PATH_VIEW . 'client/layouts/master.php';
     }
 }

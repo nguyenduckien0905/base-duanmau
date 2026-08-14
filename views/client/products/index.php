@@ -1,3 +1,23 @@
+<?php
+// Giữ nguyên lọc, tìm kiếm và sắp xếp trong mọi liên kết chuyển trang.
+$paginationParams = [];
+
+if ($keyword !== '') {
+    $paginationParams['keyword'] = $keyword;
+}
+
+if ($categoryId > 0) {
+    $paginationParams['category_id'] = $categoryId;
+}
+
+if ($sort !== 'newest') {
+    $paginationParams['sort'] = $sort;
+}
+
+$startPage = max(1, $page - 2);
+$endPage = min($totalPages, $page + 2);
+?>
+
 <!-- Nội dung chính của trang danh sách và tìm kiếm sản phẩm. -->
 <section class="section">
     <div class="container">
@@ -8,9 +28,9 @@
                 <p>
                     <!-- Khi có keyword thì in từ khóa và số lượng kết quả. -->
                     <?php if ($keyword !== ''): ?>
-                        Từ khóa “<?= e($keyword) ?>” · <?= count($products) ?> sản phẩm
+                        Từ khóa “<?= e($keyword) ?>” · <?= e($totalProducts) ?> sản phẩm
                     <?php else: ?>
-                        Có <?= count($products) ?> sản phẩm phù hợp
+                        Có <?= e($totalProducts) ?> sản phẩm phù hợp
                     <?php endif; ?>
                 </p>
             </div>
@@ -57,6 +77,86 @@
                 <?php foreach ($products as $item): ?>
                     <?php require PATH_VIEW . 'client/products/_card.php'; ?>
                 <?php endforeach; ?>
+            </div>
+
+            <div class="pagination-footer client-pagination-footer">
+                <p class="pagination-summary">
+                    Hiển thị <?= e($fromProduct) ?>–<?= e($toProduct) ?>
+                    trong <?= e($totalProducts) ?> sản phẩm
+                </p>
+
+                <?php if ($totalPages > 1): ?>
+                    <nav class="pagination" aria-label="Phân trang sản phẩm">
+                        <?php if ($page > 1): ?>
+                            <a
+                                class="pagination-link"
+                                href="<?= e(url(
+                                    'products',
+                                    array_merge($paginationParams, ['page' => $page - 1])
+                                )) ?>"
+                            >
+                                ‹ Trước
+                            </a>
+                        <?php else: ?>
+                            <span class="pagination-link disabled">‹ Trước</span>
+                        <?php endif; ?>
+
+                        <?php if ($startPage > 1): ?>
+                            <a
+                                class="pagination-link"
+                                href="<?= e(url(
+                                    'products',
+                                    array_merge($paginationParams, ['page' => 1])
+                                )) ?>"
+                            >1</a>
+
+                            <?php if ($startPage > 2): ?>
+                                <span class="pagination-ellipsis">…</span>
+                            <?php endif; ?>
+                        <?php endif; ?>
+
+                        <?php for ($pageNumber = $startPage; $pageNumber <= $endPage; $pageNumber++): ?>
+                            <a
+                                class="pagination-link <?= $pageNumber === $page ? 'active' : '' ?>"
+                                href="<?= e(url(
+                                    'products',
+                                    array_merge($paginationParams, ['page' => $pageNumber])
+                                )) ?>"
+                                <?= $pageNumber === $page ? 'aria-current="page"' : '' ?>
+                            >
+                                <?= e($pageNumber) ?>
+                            </a>
+                        <?php endfor; ?>
+
+                        <?php if ($endPage < $totalPages): ?>
+                            <?php if ($endPage < $totalPages - 1): ?>
+                                <span class="pagination-ellipsis">…</span>
+                            <?php endif; ?>
+
+                            <a
+                                class="pagination-link"
+                                href="<?= e(url(
+                                    'products',
+                                    array_merge($paginationParams, ['page' => $totalPages])
+                                )) ?>"
+                            ><?= e($totalPages) ?></a>
+                        <?php endif; ?>
+
+                        <?php if ($page < $totalPages): ?>
+                            <a
+                                class="pagination-link"
+                                href="<?= e(url(
+                                    'products',
+                                    array_merge($paginationParams, ['page' => $page + 1])
+                                )) ?>"
+                            >
+                                Sau ›
+                            </a>
+                        <?php else: ?>
+                            <span class="pagination-link disabled">Sau ›</span>
+                        <?php endif; ?>
+                    </nav>
+                <?php endif; ?>
             </div>
         <?php else: ?>
             <!-- Trạng thái rỗng khi không có sản phẩm phù hợp bộ lọc. -->

@@ -2,16 +2,19 @@
 
 // File này nằm trong controllers/client để tách biệt với AdminProductController.
 // Controller xử lý toàn bộ luồng xem sản phẩm phía Client.
-class ProductController
+class ClientProductController
 {
     // Model dùng để đọc dữ liệu sản phẩm từ cơ sở dữ liệu.
     private ClientProductModel $productModel;
+
+    private ClientReviewModel $reviewModel;
 
     // Hàm khởi tạo controller.
     public function __construct()
     {
         // Tạo đối tượng model để sử dụng cho danh sách, tìm kiếm và chi tiết.
         $this->productModel = new ClientProductModel();
+        $this->reviewModel = new ClientReviewModel();
     }
 
     // Hiển thị danh sách, tìm kiếm, lọc và sắp xếp sản phẩm.
@@ -34,8 +37,27 @@ class ProductController
             $sort = 'newest';
         }
 
-        // Gửi điều kiện sang model và nhận về danh sách sản phẩm phù hợp.
-        $products = $this->productModel->getAll($keyword, $categoryId, $sort);
+        // Client hiển thị 12 sản phẩm trên mỗi trang.
+        $perPage = 12;
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+
+        // Đếm tổng kết quả trước để giới hạn page hợp lệ.
+        $totalProducts = $this->productModel->countAll(
+            $keyword,
+            $categoryId
+        );
+        $totalPages = max(1, (int) ceil($totalProducts / $perPage));
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $perPage;
+
+        // Chỉ lấy dữ liệu thuộc trang hiện tại.
+        $products = $this->productModel->getAll(
+            $keyword,
+            $categoryId,
+            $sort,
+            $perPage,
+            $offset
+        );
 
         // Lấy danh mục để tạo các lựa chọn trong ô lọc.
         $categories = $this->productModel->getCategories();
@@ -43,11 +65,15 @@ class ProductController
         // Đổi tiêu đề trang khi người dùng đang tìm kiếm.
         $pageTitle = $keyword === '' ? 'Sản phẩm' : 'Kết quả tìm kiếm';
 
+        // Thông tin phân trang được view dùng để tạo nút và phần mô tả.
+        $fromProduct = $totalProducts === 0 ? 0 : $offset + 1;
+        $toProduct = min($offset + $perPage, $totalProducts);
+
         // Chọn file view hiển thị danh sách sản phẩm.
         $contentView = PATH_VIEW . 'client/products/index.php';
 
         // Nạp layout chung của Client.
-        require PATH_VIEW_CLIENT_MAIN;
+        require PATH_VIEW . 'client/layouts/master.php';
     }
 
     // Route tìm kiếm dùng lại hoàn toàn xử lý của trang danh sách.
@@ -78,15 +104,27 @@ class ProductController
             $contentView = PATH_VIEW . 'client/errors/404.php';
 
             // Nạp layout để trang lỗi vẫn có header và footer.
-            require PATH_VIEW_CLIENT_MAIN;
+            require PATH_VIEW . 'client/layouts/master.php';
 
             // Dừng phương thức để không chạy tiếp phần chi tiết bên dưới.
             return;
         }
 
+        // Lấy các tổ hợp màu-size do Admin quản lý.
+        $variants = $this->productModel->getVariants(
+            (int) $product['product_id']
+        );
+
         // Lấy 4 sản phẩm cùng danh mục và loại trừ sản phẩm đang xem.
         $relatedProducts = $this->productModel->getRelated(
             (int) $product['category_id'],
+            (int) $product['product_id']
+        );
+
+        $reviews = $this->reviewModel->getVisibleByProduct(
+            (int) $product['product_id']
+        );
+        $reviewSummary = $this->reviewModel->getSummary(
             (int) $product['product_id']
         );
 
@@ -97,6 +135,6 @@ class ProductController
         $contentView = PATH_VIEW . 'client/products/detail.php';
 
         // Nạp layout chung để hiển thị trang.
-        require PATH_VIEW_CLIENT_MAIN;
+        require PATH_VIEW . 'client/layouts/master.php';
     }
 }

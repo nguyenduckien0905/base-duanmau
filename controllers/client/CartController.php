@@ -2,13 +2,14 @@
 
 /**
  * Controller quản lý giỏ hàng bằng session.
+ *
+ * Mỗi dòng giỏ được định danh bằng variant_id để màu, size và tồn kho luôn là
+ * cùng một tổ hợp mà Admin đã tạo.
  */
-class CartController
+class ClientCartController
 {
-    // Model sản phẩm dùng để kiểm tra giá, trạng thái và tồn kho hiện tại.
     private ClientProductModel $productModel;
 
-    // Khởi tạo model sản phẩm.
     public function __construct()
     {
         $this->productModel = new ClientProductModel();
@@ -19,24 +20,19 @@ class CartController
      */
     public function index(): void
     {
-        // Đồng bộ lại dữ liệu giỏ với database trước khi hiển thị.
         $cart = $this->syncCart();
-
-        // Tính tổng tiền từ giỏ đã đồng bộ.
         $subtotal = $this->subtotal($cart);
 
-        // Chọn view giỏ hàng.
         $pageTitle = 'Giỏ hàng';
         $contentView = PATH_VIEW . 'client/cart/index.php';
-        require PATH_VIEW_CLIENT_MAIN;
+        require PATH_VIEW . 'client/layouts/master.php';
     }
 
     /**
-     * Thêm sản phẩm vào giỏ.
+     * Thêm đúng một biến thể vào giỏ.
      */
     public function add(): void
     {
-        // Chỉ nhận dữ liệu thêm giỏ qua POST.
         if (!isPost()) {
             abort404();
             return;
@@ -44,61 +40,64 @@ class CartController
 
         verifyCsrf();
 
-        // Lấy dữ liệu sản phẩm và phân loại từ form chi tiết.
         $productId = max(0, (int) ($_POST['product_id'] ?? 0));
+        $variantId = max(0, (int) ($_POST['variant_id'] ?? 0));
         $quantity = max(1, (int) ($_POST['quantity'] ?? 1));
-        $size = trim((string) ($_POST['size'] ?? ''));
-        $color = trim((string) ($_POST['color'] ?? ''));
+        $selectedColor = trim(
+            (string) ($_POST['selected_color'] ?? '')
+        );
 
-        // Luôn đọc lại sản phẩm từ database, không tin giá gửi từ trình duyệt.
-        $product = $this->productModel->find($productId);
+        // Model kiểm tra đồng thời sản phẩm, biến thể và trạng thái đang bán.
+        $variant = $this->productModel->findPurchasableVariant(
+            $variantId,
+            $productId
+        );
 
-        // Không thêm sản phẩm không tồn tại hoặc đã ngừng bán.
-        if (!$product) {
-            setFlash('error', 'Sản phẩm không tồn tại hoặc đã ngừng bán.');
-            redirect('products');
-        }
-
-        // Không cho thêm quá số lượng còn trong kho.
-        if ((int) $product['stock'] < $quantity) {
-            setFlash('error', 'Số lượng sản phẩm trong kho không đủ.');
+        if (!$variant) {
+            setFlash(
+                'error',
+                'Phân loại sản phẩm không tồn tại hoặc đã ngừng bán.'
+            );
             redirect('products/detail', ['id' => $productId]);
         }
 
-        // Ghép id, size và color thành khóa riêng cho từng phân loại.
-        $key = $productId . '|' . $size . '|' . $color;
+        // Không để giao diện bị sửa thành màu không thuộc variant đã gửi.
+        if ($selectedColor === '' || $selectedColor !== $variant['color']) {
+            setFlash('error', 'Màu sắc và kích thước không khớp.');
+            redirect('products/detail', ['id' => $productId]);
+        }
 
-        // Lấy giỏ hiện tại hoặc tạo mảng rỗng.
-        $cart = $_SESSION['cart'] ?? [];
+        if ((int) $variant['stock'] <= 0) {
+            setFlash('error', 'Phân loại bạn chọn đã hết hàng.');
+            redirect('products/detail', ['id' => $productId]);
+        }
 
-        // Nếu phân loại đã có thì cộng thêm số lượng.
-        $newQuantity = ($cart[$key]['quantity'] ?? 0) + $quantity;
+        if ($quantity > (int) $variant['stock']) {
+            setFlash(
+                'error',
+                'Phân loại bạn chọn chỉ còn '
+                . (int) $variant['stock']
+                . ' sản phẩm.'
+            );
+            redirect('products/detail', ['id' => $productId]);
+        }
 
-        // Chặn tổng số lượng trong giỏ vượt quá tồn kho.
-        $newQuantity = min($newQuantity, (int) $product['stock']);
+        // Chuẩn hóa giỏ cũ trước khi cộng thêm sản phẩm mới.
+        $cart = $this->syncCart();
+        $key = $this->cartKey($variantId);
 
-        // Lưu dữ liệu cần thiết để hiển thị nhanh trong session.
-        $cart[$key] = [
-            'product_id' => (int) $product['product_id'],
-            'product_name' => $product['product_name'],
-            'image' => $product['image'],
-            'price' => (float) $product['price'],
-            'size' => $size,
-            'color' => $color,
-            'stock' => (int) $product['stock'],
-            'quantity' => $newQuantity,
-        ];
+        $newQuantity = (int) ($cart[$key]['quantity'] ?? 0) + $quantity;
+        $newQuantity = min($newQuantity, (int) $variant['stock']);
 
-        // Ghi giỏ mới trở lại session.
+        $cart[$key] = $this->cartItem($variant, $newQuantity);
         $_SESSION['cart'] = $cart;
 
-        // Thông báo và chuyển đến trang giỏ hàng.
-        setFlash('success', 'Đã thêm sản phẩm vào giỏ hàng.');
+        setFlash('success', 'Đã thêm đúng màu và kích thước vào giỏ hàng.');
         redirect('cart');
     }
 
     /**
-     * Cập nhật số lượng tất cả sản phẩm trong giỏ.
+     * Cập nhật số lượng tất cả dòng giỏ.
      */
     public function update(): void
     {
@@ -109,32 +108,33 @@ class CartController
 
         verifyCsrf();
 
-        // Lấy mảng quantity có key tương ứng với từng dòng giỏ.
         $quantities = $_POST['quantities'] ?? [];
-        $cart = $_SESSION['cart'] ?? [];
+        $cart = $this->syncCart();
 
-        // Duyệt từng dòng giỏ hiện tại.
         foreach ($cart as $key => $item) {
-            // Số lượng 0 được hiểu là xóa sản phẩm khỏi giỏ.
-            $quantity = max(0, (int) ($quantities[$key] ?? $item['quantity']));
+            $quantity = max(
+                0,
+                (int) ($quantities[$key] ?? $item['quantity'])
+            );
 
             if ($quantity === 0) {
                 unset($cart[$key]);
                 continue;
             }
 
-            // Không cho số lượng vượt quá tồn kho đã biết.
-            $cart[$key]['quantity'] = min($quantity, (int) $item['stock']);
+            $cart[$key]['quantity'] = min(
+                $quantity,
+                (int) $item['stock']
+            );
         }
 
-        // Lưu giỏ sau cập nhật.
         $_SESSION['cart'] = $cart;
         setFlash('success', 'Đã cập nhật giỏ hàng.');
         redirect('cart');
     }
 
     /**
-     * Xóa một dòng sản phẩm khỏi giỏ.
+     * Xóa một dòng biến thể khỏi giỏ.
      */
     public function remove(): void
     {
@@ -145,10 +145,7 @@ class CartController
 
         verifyCsrf();
 
-        // Key được gửi từ form xóa của đúng dòng sản phẩm.
         $key = (string) ($_POST['key'] ?? '');
-
-        // Xóa key nếu nó tồn tại.
         unset($_SESSION['cart'][$key]);
 
         setFlash('success', 'Đã xóa sản phẩm khỏi giỏ.');
@@ -156,34 +153,91 @@ class CartController
     }
 
     /**
-     * Đọc lại từng sản phẩm để giỏ luôn khớp dữ liệu Admin.
+     * Đồng bộ session với dữ liệu Admin hiện tại.
+     *
+     * Hàm cũng chuyển giỏ cũ dạng product|size|color sang variant_id nếu tìm
+     * được một tổ hợp khớp hoàn toàn.
      */
     private function syncCart(): array
     {
-        $cart = $_SESSION['cart'] ?? [];
+        $oldCart = $_SESSION['cart'] ?? [];
+        $syncedCart = [];
 
-        foreach ($cart as $key => $item) {
-            $product = $this->productModel->find((int) $item['product_id']);
+        if (!is_array($oldCart)) {
+            $_SESSION['cart'] = [];
+            return [];
+        }
 
-            // Admin xóa hoặc tắt sản phẩm thì loại sản phẩm khỏi giỏ.
-            if (!$product || (int) $product['stock'] <= 0) {
-                unset($cart[$key]);
+        foreach ($oldCart as $item) {
+            if (!is_array($item)) {
                 continue;
             }
 
-            // Cập nhật lại tên, ảnh, giá và tồn kho mới nhất từ Admin.
-            $cart[$key]['product_name'] = $product['product_name'];
-            $cart[$key]['image'] = $product['image'];
-            $cart[$key]['price'] = (float) $product['price'];
-            $cart[$key]['stock'] = (int) $product['stock'];
-            $cart[$key]['quantity'] = min(
-                (int) $item['quantity'],
-                (int) $product['stock']
+            $productId = max(0, (int) ($item['product_id'] ?? 0));
+            $variantId = max(0, (int) ($item['variant_id'] ?? 0));
+
+            // Nâng cấp im lặng dòng giỏ được tạo bởi Client phiên bản cũ.
+            if ($variantId === 0 && $productId > 0) {
+                $legacyVariant = $this->productModel->findVariantByAttributes(
+                    $productId,
+                    trim((string) ($item['color'] ?? '')),
+                    trim((string) ($item['size'] ?? ''))
+                );
+
+                $variantId = (int) ($legacyVariant['variant_id'] ?? 0);
+            }
+
+            if ($variantId === 0) {
+                continue;
+            }
+
+            $variant = $this->productModel->findPurchasableVariant(
+                $variantId,
+                $productId
             );
+
+            if (!$variant || (int) $variant['stock'] <= 0) {
+                continue;
+            }
+
+            $key = $this->cartKey($variantId);
+            $quantity = max(1, (int) ($item['quantity'] ?? 1));
+
+            // Nếu giỏ cũ có hai dòng trùng biến thể thì gộp lại an toàn.
+            $quantity += (int) ($syncedCart[$key]['quantity'] ?? 0);
+            $quantity = min($quantity, (int) $variant['stock']);
+
+            $syncedCart[$key] = $this->cartItem($variant, $quantity);
         }
 
-        $_SESSION['cart'] = $cart;
-        return $cart;
+        $_SESSION['cart'] = $syncedCart;
+        return $syncedCart;
+    }
+
+    /**
+     * Tạo dữ liệu session từ bản ghi database, không nhận giá từ trình duyệt.
+     */
+    private function cartItem(array $variant, int $quantity): array
+    {
+        return [
+            'variant_id' => (int) $variant['variant_id'],
+            'product_id' => (int) $variant['product_id'],
+            'product_name' => $variant['product_name'],
+            'image' => $variant['image'],
+            'price' => (float) $variant['price'],
+            'size' => $variant['size'],
+            'color' => $variant['color'],
+            'stock' => (int) $variant['stock'],
+            'quantity' => $quantity,
+        ];
+    }
+
+    /**
+     * Khóa session không chứa dữ liệu người dùng nhập tay.
+     */
+    private function cartKey(int $variantId): string
+    {
+        return 'variant_' . $variantId;
     }
 
     /**
@@ -194,7 +248,8 @@ class CartController
         $subtotal = 0;
 
         foreach ($cart as $item) {
-            $subtotal += (float) $item['price'] * (int) $item['quantity'];
+            $subtotal += (float) $item['price']
+                * (int) $item['quantity'];
         }
 
         return $subtotal;

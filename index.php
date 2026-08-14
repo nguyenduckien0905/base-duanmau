@@ -28,7 +28,9 @@ require_once PATH_MODEL . 'BaseModel.php';
 // ==================================================
 // NẠP MODEL CỦA CLIENT
 // ==================================================
-
+require_once PATH_MODEL_CLIENT . 'AuthModel.php';
+require_once PATH_MODEL_CLIENT . 'OrderModel.php';
+require_once PATH_MODEL_CLIENT . 'ReviewModel.php';
 // Model Client đọc cùng bảng products mà phần Admin đang quản lý.
 require_once PATH_MODEL_CLIENT . 'ProductModel.php';
 
@@ -48,5 +50,6 @@ require_once PATH_CONTROLLER_CLIENT . 'ProductController.php';
 require_once PATH_CONTROLLER_CLIENT . 'AuthController.php';
 require_once PATH_CONTROLLER_CLIENT . 'CartController.php';
 require_once PATH_CONTROLLER_CLIENT . 'OrderController.php';
+require_once PATH_CONTROLLER_CLIENT . 'ReviewController.php';
 // Điều hướng
 require_once './routes/index.php';
