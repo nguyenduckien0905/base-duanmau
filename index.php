@@ -1,23 +1,27 @@
 <?php
 
-// Nạp các hằng số cấu hình của dự án.
-require_once __DIR__ . '/configs/env.php';
+// Khởi tạo session cho đăng nhập, CSRF và giỏ hàng.
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Nạp các hàm dùng chung của dự án.
+// ==================================================
+// NẠP CONFIG VÀ HELPER
+// ==================================================
+
+require_once __DIR__ . '/configs/env.php';
 require_once PATH_ROOT . 'configs/helper.php';
 
 // ==================================================
 // NẠP MODEL DÙNG CHUNG
 // ==================================================
 
-// BaseModel nằm trực tiếp trong thư mục models.
 require_once PATH_MODEL . 'BaseModel.php';
 
 // ==================================================
-// NẠP MODEL CỦA ADMIN
+// NẠP MODEL ADMIN
 // ==================================================
 
-// Các model Admin nằm trong thư mục models/admin.
 require_once PATH_MODEL . 'admin/AdminAuthModel.php';
 require_once PATH_MODEL . 'admin/DashboardModel.php';
 require_once PATH_MODEL . 'admin/CategoryModel.php';
@@ -30,25 +34,25 @@ require_once PATH_MODEL . 'admin/CouponModel.php';
 require_once PATH_MODEL . 'admin/BannerModel.php';
 
 // ==================================================
-// NẠP CONTROLLER CỦA CLIENT
+// NẠP MODEL CLIENT
 // ==================================================
 
-// HomeController nằm trực tiếp trong thư mục controllers.
-require_once PATH_CONTROLLER . 'HomeController.php';
+require_once PATH_MODEL . 'client/ProductModel.php';
+require_once PATH_MODEL . 'client/AuthModel.php';
+require_once PATH_MODEL . 'client/OrderModel.php';
+require_once PATH_MODEL . 'client/ReviewModel.php';
 
 // ==================================================
 // NẠP CONTROLLER NỀN CỦA ADMIN
 // ==================================================
 
-// Controller nền phải được nạp trước controller con.
 require_once PATH_CONTROLLER . 'admin/BaseController.php';
 require_once PATH_CONTROLLER . 'admin/AdminBaseController.php';
 
 // ==================================================
-// NẠP CONTROLLER CỦA ADMIN
+// NẠP CONTROLLER ADMIN
 // ==================================================
 
-// Các controller Admin nằm trong thư mục controllers/admin.
 require_once PATH_CONTROLLER . 'admin/AdminAuthController.php';
 require_once PATH_CONTROLLER . 'admin/AdminDashboardController.php';
 require_once PATH_CONTROLLER . 'admin/AdminCategoryController.php';
@@ -61,8 +65,18 @@ require_once PATH_CONTROLLER . 'admin/AdminCouponController.php';
 require_once PATH_CONTROLLER . 'admin/AdminBannerController.php';
 
 // ==================================================
-// NẠP ROUTER
+// NẠP CONTROLLER CLIENT
 // ==================================================
 
-// Router phải được nạp cuối cùng sau model và controller.
+require_once PATH_CONTROLLER . 'client/HomeController.php';
+require_once PATH_CONTROLLER . 'client/ProductController.php';
+require_once PATH_CONTROLLER . 'client/AuthController.php';
+require_once PATH_CONTROLLER . 'client/CartController.php';
+require_once PATH_CONTROLLER . 'client/OrderController.php';
+require_once PATH_CONTROLLER . 'client/ReviewController.php';
+
+// ==================================================
+// NẠP ROUTER CUỐI CÙNG
+// ==================================================
+
 require_once PATH_ROOT . 'routes/index.php';

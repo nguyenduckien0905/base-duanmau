@@ -1,7 +1,7 @@
 <?php
 
 // URL gốc của dự án trên XAMPP; sửa BaseExam thành tên thư mục dự án của bạn.
-define('BASE_URL', 'http://localhost/Du_An_1/base-duanmau/');
+define('BASE_URL', 'http://localhost/base-duanmau/');
 
 // Đường dẫn tuyệt đối tới thư mục gốc của dự án.
 define('PATH_ROOT', __DIR__ . '/../');
@@ -29,6 +29,12 @@ define('PATH_CONTROLLER_ADMIN', PATH_CONTROLLER . 'admin/');
 
 // Đường dẫn đến model Admin.
 define('PATH_MODEL_ADMIN', PATH_MODEL . 'admin/');
+
+// Thông tin nhận chuyển khoản hiển thị tại trang thanh toán Client.
+define('BANK_NAME', 'Techcombank');
+define('BANK_ACCOUNT_NUMBER', '4618699999');
+define('BANK_ACCOUNT_HOLDER', 'DINH THANH DAT');
+define('BANK_QR_IMAGE', BASE_URL . 'assets/images/bank-qr-techcombank.jpg');
 
 // Thông tin kết nối MySQL trên XAMPP.
 define('DB_HOST', 'localhost');

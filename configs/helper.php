@@ -231,6 +231,68 @@ if (!function_exists('currentAdmin')) {
 }
 
 // ==================================================
+// XÁC THỰC VÀ GIỎ HÀNG CLIENT
+// ==================================================
+
+if (!function_exists('currentClient')) {
+    /**
+     * Lấy thông tin khách hàng đang đăng nhập.
+     */
+    function currentClient(): ?array
+    {
+        // Nếu chưa đăng nhập thì trả null.
+        return $_SESSION['client'] ?? null;
+    }
+}
+
+if (!function_exists('requireClient')) {
+    /**
+     * Bắt buộc khách hàng đăng nhập trước khi thanh toán hoặc xem đơn.
+     */
+    function requireClient(string $next = ''): void
+    {
+        // Chỉ chuyển trang khi session Client chưa tồn tại.
+        if (empty($_SESSION['client'])) {
+            setFlash('error', 'Vui lòng đăng nhập để tiếp tục.');
+
+            // next giúp trang login biết cần quay lại checkout.
+            $params = $next === '' ? [] : ['next' => $next];
+            redirect('login', $params);
+        }
+    }
+}
+
+if (!function_exists('cartCount')) {
+    /**
+     * Tính tổng số lượng sản phẩm trong giỏ hàng.
+     */
+    function cartCount(): int
+    {
+        // Nếu chưa có session giỏ hàng thì trả về 0.
+        if (
+            empty($_SESSION['cart'])
+            || !is_array($_SESSION['cart'])
+        ) {
+            return 0;
+        }
+
+        // Biến lưu tổng số lượng.
+        $total = 0;
+
+        // Duyệt từng sản phẩm trong giỏ.
+        foreach ($_SESSION['cart'] as $item) {
+            // Cộng trường quantity.
+            $total += (int) (
+                $item['quantity'] ?? 0
+            );
+        }
+
+        // Trả tổng số lượng.
+        return $total;
+    }
+}
+
+// ==================================================
 // ĐỊNH DẠNG DỮ LIỆU
 // ==================================================
 
@@ -260,6 +322,7 @@ if (!function_exists('orderStatusText')) {
             'confirmed' => 'Đã xác nhận',
             'preparing' => 'Đang chuẩn bị',
             'shipping' => 'Đang giao',
+            'delivered' => 'Đã giao - chờ khách xác nhận',
             'completed' => 'Hoàn thành',
             'cancelled' => 'Đã hủy',
             default => 'Không xác định',
@@ -275,12 +338,51 @@ if (!function_exists('orderStatusClass')) {
     {
         return match ($status) {
             'completed' => 'badge-success',
+            'delivered' => 'badge-info',
             'cancelled' => 'badge-danger',
             'shipping' => 'badge-info',
 
             'confirmed',
             'preparing' => 'badge-warning',
 
+            default => 'badge-muted',
+        };
+    }
+}
+
+if (!function_exists('paymentMethodText')) {
+    function paymentMethodText(?string $method): string
+    {
+        return match ($method) {
+            'bank_transfer' => 'Chuyển khoản ngân hàng',
+            'cod' => 'Thanh toán khi nhận hàng (COD)',
+            'momo' => 'Ví MoMo',
+            'vnpay' => 'VNPAY',
+            default => 'Chưa xác định',
+        };
+    }
+}
+
+if (!function_exists('paymentStatusText')) {
+    function paymentStatusText(?string $status): string
+    {
+        return match ($status) {
+            'paid' => 'Đã thanh toán',
+            'failed' => 'Minh chứng không hợp lệ',
+            'refunded' => 'Đã hoàn tiền',
+            'pending' => 'Chờ kiểm tra',
+            default => 'Chờ kiểm tra',
+        };
+    }
+}
+
+if (!function_exists('paymentStatusClass')) {
+    function paymentStatusClass(?string $status): string
+    {
+        return match ($status) {
+            'paid' => 'badge-success',
+            'failed' => 'badge-danger',
+            'refunded' => 'badge-warning',
             default => 'badge-muted',
         };
     }
@@ -448,6 +550,89 @@ if (!function_exists('deleteUploadedImage')) {
             . $normalizedPath;
 
         // Chỉ xóa khi file tồn tại.
+        if (is_file($absolutePath)) {
+            unlink($absolutePath);
+        }
+    }
+}
+
+if (!function_exists('uploadPaymentProof')) {
+    /** Upload ảnh minh chứng chuyển khoản, tối đa 5 MB. */
+    function uploadPaymentProof(string $fieldName): ?string
+    {
+        if (empty($_FILES[$fieldName])) {
+            return null;
+        }
+
+        $file = $_FILES[$fieldName];
+        $error = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+
+        if ($error === UPLOAD_ERR_NO_FILE) {
+            return null;
+        }
+
+        if ($error !== UPLOAD_ERR_OK) {
+            throw new RuntimeException('Không thể tải ảnh minh chứng lên.');
+        }
+
+        if ((int) ($file['size'] ?? 0) > 5 * 1024 * 1024) {
+            throw new RuntimeException('Ảnh minh chứng không được lớn hơn 5 MB.');
+        }
+
+        $fileInfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime = $fileInfo->file((string) $file['tmp_name']);
+        $allowedMimes = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+        ];
+
+        if (!isset($allowedMimes[$mime])) {
+            throw new RuntimeException(
+                'Minh chứng chỉ chấp nhận ảnh JPG, PNG hoặc WEBP.'
+            );
+        }
+
+        $folder = 'payment-proofs';
+        $destinationDirectory = PATH_ASSETS_UPLOADS . $folder . '/';
+
+        if (
+            !is_dir($destinationDirectory)
+            && !mkdir($destinationDirectory, 0775, true)
+        ) {
+            throw new RuntimeException(
+                'Không thể tạo thư mục lưu minh chứng thanh toán.'
+            );
+        }
+
+        $fileName = date('YmdHis')
+            . '-'
+            . bin2hex(random_bytes(8))
+            . '.'
+            . $allowedMimes[$mime];
+        $destinationPath = $destinationDirectory . $fileName;
+
+        if (!move_uploaded_file($file['tmp_name'], $destinationPath)) {
+            throw new RuntimeException('Không thể lưu ảnh minh chứng thanh toán.');
+        }
+
+        return $folder . '/' . $fileName;
+    }
+}
+
+if (!function_exists('deletePaymentProof')) {
+    function deletePaymentProof(?string $relativePath): void
+    {
+        if (empty($relativePath)) {
+            return;
+        }
+
+        $normalizedPath = str_replace('\\', '/', $relativePath);
+        if (!str_starts_with($normalizedPath, 'payment-proofs/')) {
+            return;
+        }
+
+        $absolutePath = PATH_ASSETS_UPLOADS . $normalizedPath;
         if (is_file($absolutePath)) {
             unlink($absolutePath);
         }
