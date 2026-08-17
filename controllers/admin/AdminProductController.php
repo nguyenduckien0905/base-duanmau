@@ -33,15 +33,43 @@ class AdminProductController extends AdminBaseController
     {
         // Lấy điều kiện lọc từ URL.
         $keyword = trim((string) ($_GET['keyword'] ?? ''));
-        $categoryId = (int) ($_GET['category_id'] ?? 0);
+        $categoryId = max(0, (int) ($_GET['category_id'] ?? 0));
+
+        // Admin hiển thị 20 sản phẩm trên mỗi trang.
+        $perPage = 20;
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+
+        // COUNT được chạy trước để xác định phạm vi trang hợp lệ.
+        $totalProducts = $this->model->countAll(
+            $keyword,
+            $categoryId
+        );
+        $totalPages = max(1, (int) ceil($totalProducts / $perPage));
+
+        // URL page quá lớn được đưa về trang cuối thay vì trả danh sách rỗng.
+        $page = min($page, $totalPages);
+        $offset = ($page - 1) * $perPage;
+
+        $products = $this->model->getAll(
+            $keyword,
+            $categoryId,
+            $perPage,
+            $offset
+        );
 
         // Gửi dữ liệu sang view.
         $this->render('admin/products/index', [
             'pageTitle' => 'Sản phẩm',
-            'products' => $this->model->getAll($keyword, $categoryId),
+            'products' => $products,
             'categories' => $this->categoryModel->getOptions(),
             'keyword' => $keyword,
             'categoryId' => $categoryId,
+            'page' => $page,
+            'perPage' => $perPage,
+            'totalPages' => $totalPages,
+            'totalProducts' => $totalProducts,
+            'fromProduct' => $totalProducts === 0 ? 0 : $offset + 1,
+            'toProduct' => min($offset + $perPage, $totalProducts),
         ]);
     }
 

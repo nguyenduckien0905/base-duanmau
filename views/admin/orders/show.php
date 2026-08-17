@@ -1,4 +1,4 @@
-<!-- Thao tác quay lại và cập nhật trạng thái. -->
+<!-- Quay lại và cập nhật trạng thái giao hàng. -->
 <div class="toolbar">
     <a class="btn btn-light" href="<?= e(url('admin/orders')) ?>">← Quay lại danh sách</a>
 
@@ -19,12 +19,22 @@
                 <?php endforeach; ?>
             </select>
 
-            <button class="btn btn-primary" type="submit">Cập nhật</button>
+            <button class="btn btn-primary" type="submit">Cập nhật giao hàng</button>
         </form>
     <?php endif; ?>
 </div>
 
-<!-- Thông tin khách hàng và thanh toán. -->
+<?php if (
+    $order['payment_method'] === 'bank_transfer'
+    && $order['payment_status'] !== 'paid'
+): ?>
+    <div class="alert alert-warning">
+        Đơn chuyển khoản chỉ được xác nhận sau khi nhân viên kiểm tra ảnh
+        minh chứng và chuyển trạng thái thanh toán sang “Đã thanh toán”.
+    </div>
+<?php endif; ?>
+
+<!-- Thông tin khách hàng và trạng thái đơn. -->
 <section class="detail-grid">
     <div class="panel detail-card">
         <div class="panel-heading">
@@ -55,28 +65,94 @@
                 <dt>Ghi chú</dt>
                 <dd><?= e($order['note'] ?: 'Không có') ?></dd>
             </div>
+            <div>
+                <dt>Mã giảm giá</dt>
+                <dd><?= e($order['coupon_code'] ?: 'Không sử dụng') ?></dd>
+            </div>
+
+            <?php if (!empty($order['delivered_at'])): ?>
+                <div>
+                    <dt>Đã giao lúc</dt>
+                    <dd><?= e(date('d/m/Y H:i', strtotime($order['delivered_at']))) ?></dd>
+                </div>
+            <?php endif; ?>
+
+            <?php if (!empty($order['completed_at'])): ?>
+                <div>
+                    <dt>Khách nhận lúc</dt>
+                    <dd><?= e(date('d/m/Y H:i', strtotime($order['completed_at']))) ?></dd>
+                </div>
+            <?php endif; ?>
         </dl>
     </div>
 
-    <div class="panel detail-card">
+    <div class="panel detail-card payment-review-card">
         <div class="panel-heading">
-            <h2>Thanh toán</h2>
+            <h2>Kiểm tra thanh toán</h2>
+            <span class="badge <?= e(paymentStatusClass($order['payment_status'] ?? null)) ?>">
+                <?= e(paymentStatusText($order['payment_status'] ?? null)) ?>
+            </span>
         </div>
 
         <dl>
             <div>
                 <dt>Phương thức</dt>
-                <dd><?= e(strtoupper($order['payment_method'] ?? 'Chưa có')) ?></dd>
-            </div>
-            <div>
-                <dt>Trạng thái</dt>
-                <dd><?= e($order['payment_status'] ?? 'Chưa có') ?></dd>
+                <dd><?= e(paymentMethodText($order['payment_method'] ?? null)) ?></dd>
             </div>
             <div>
                 <dt>Mã giao dịch</dt>
                 <dd><?= e($order['transaction_id'] ?: 'Không có') ?></dd>
             </div>
+            <div>
+                <dt>Ghi chú duyệt</dt>
+                <dd><?= e($order['admin_note'] ?: 'Chưa có') ?></dd>
+            </div>
         </dl>
+
+        <?php if (!empty($order['proof_image'])): ?>
+            <div class="payment-proof-preview">
+                <p><strong>Ảnh minh chứng khách đã gửi</strong></p>
+                <a
+                    href="<?= e(BASE_ASSETS_UPLOADS . $order['proof_image']) ?>"
+                    target="_blank"
+                    rel="noopener"
+                >
+                    <img
+                        src="<?= e(BASE_ASSETS_UPLOADS . $order['proof_image']) ?>"
+                        alt="Minh chứng thanh toán đơn #<?= e($order['order_id']) ?>"
+                    >
+                </a>
+                <small>Bấm vào ảnh để xem kích thước đầy đủ.</small>
+            </div>
+        <?php elseif ($order['payment_method'] === 'bank_transfer'): ?>
+            <div class="empty-state">Khách chưa gửi ảnh minh chứng.</div>
+        <?php endif; ?>
+
+        <form
+            class="payment-status-form"
+            action="<?= e(url('admin/orders/update-payment', ['id' => $order['order_id']])) ?>"
+            method="post"
+        >
+            <?= csrfField() ?>
+
+            <label>
+                Trạng thái thanh toán
+                <select name="payment_status" required>
+                    <option value="pending" <?= ($order['payment_status'] ?? '') === 'pending' ? 'selected' : '' ?>>Chờ kiểm tra</option>
+                    <option value="paid" <?= ($order['payment_status'] ?? '') === 'paid' ? 'selected' : '' ?>>Đã thanh toán</option>
+                    <option value="failed" <?= ($order['payment_status'] ?? '') === 'failed' ? 'selected' : '' ?>>Minh chứng không hợp lệ</option>
+                </select>
+            </label>
+
+            <label>
+                Ghi chú cho khách hàng
+                <textarea name="admin_note" rows="3" maxlength="500" placeholder="VD: Ảnh mờ, vui lòng liên hệ cửa hàng..."><?= e($order['admin_note'] ?? '') ?></textarea>
+            </label>
+
+            <button class="btn btn-primary" type="submit">
+                Lưu trạng thái thanh toán
+            </button>
+        </form>
     </div>
 </section>
 
@@ -108,9 +184,7 @@
                         <td><?= e(formatPrice($item['price'])) ?></td>
                         <td><?= e($item['quantity']) ?></td>
                         <td>
-                            <strong>
-                                <?= e(formatPrice((float) $item['price'] * (int) $item['quantity'])) ?>
-                            </strong>
+                            <strong><?= e(formatPrice((float) $item['price'] * (int) $item['quantity'])) ?></strong>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -118,7 +192,6 @@
         </table>
     </div>
 
-    <!-- Khối cộng tiền của đơn hàng. -->
     <div class="order-totals">
         <div><span>Tạm tính</span><strong><?= e(formatPrice($order['subtotal'])) ?></strong></div>
         <div><span>Phí giao hàng</span><strong><?= e(formatPrice($order['shipping_fee'])) ?></strong></div>

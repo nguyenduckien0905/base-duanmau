@@ -11,11 +11,12 @@ $isActive = static function (string $prefix) use ($currentAction): string {
     <!-- Logo của khu vực quản trị. -->
     <a class="brand" href="<?= e(url('admin/dashboard')) ?>">
         <span class="brand-mark">
-            <img style="width: 50px;" src="./assets/uploads/logo_KD.png" alt="logo thương hiệu">
+            <img style="width: 200px;" src="./assets/uploads/admin/logo_KD.png" alt="logo thương hiệu">
         </span>
+        <br>
         <span>
-            <strong>K.D Fashion </strong>
-            <small>ADMIN PANEL</small>
+            <!-- <strong>KD Fashion </strong> -->
+            <!-- <small>ADMIN PANEL</small> -->
         </span>
     </a>
 

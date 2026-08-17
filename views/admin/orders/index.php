@@ -57,9 +57,12 @@
                         <td><?= e(date('d/m/Y H:i', strtotime($order['created_at']))) ?></td>
                         <td><strong><?= e(formatPrice($order['total_price'])) ?></strong></td>
                         <td>
-                            <span class="badge <?= $order['payment_status'] === 'paid' ? 'badge-success' : 'badge-muted' ?>">
-                                <?= $order['payment_status'] === 'paid' ? 'Đã trả' : 'Chưa trả' ?>
+                            <span class="badge <?= e(paymentStatusClass($order['payment_status'] ?? null)) ?>">
+                                <?= e(paymentStatusText($order['payment_status'] ?? null)) ?>
                             </span>
+                            <small class="table-subtext">
+                                <?= e(paymentMethodText($order['payment_method'] ?? null)) ?>
+                            </small>
                         </td>
                         <td>
                             <span class="badge <?= e(orderStatusClass($order['status'])) ?>">

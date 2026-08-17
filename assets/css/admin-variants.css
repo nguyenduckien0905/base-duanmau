@@ -2,9 +2,9 @@
 .variant-box {
     margin: 8px 0 22px;
     padding: 20px;
-    border: 1px solid var(--line, #e7eaf1);
+    border: 1px solid var(--line, #e5e7eb);
     border-radius: 12px;
-    background: #fafbfe;
+    background: var(--primary-soft, #fff1f2);
 }
 
 /* Tiêu đề và nút thêm biến thể. */
@@ -27,7 +27,7 @@
 
 .variant-heading p {
     margin-top: 4px;
-    color: var(--muted, #718096);
+    color: var(--muted, #6b7280);
 }
 
 /* Không cho input và select trong bảng quá hẹp. */

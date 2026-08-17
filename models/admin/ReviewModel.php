@@ -11,10 +11,13 @@ class ReviewModel extends BaseModel
     public function getAll(): array
     {
         $sql = 'SELECT reviews.*, users.fullname, users.email,
-                       products.product_name
+                       products.product_name,
+                       order_items.order_id
                 FROM reviews
                 INNER JOIN users ON users.user_id = reviews.user_id
                 INNER JOIN products ON products.product_id = reviews.product_id
+                LEFT JOIN order_items
+                    ON order_items.order_item_id = reviews.order_item_id
                 ORDER BY reviews.created_at DESC';
 
         return $this->all($sql);

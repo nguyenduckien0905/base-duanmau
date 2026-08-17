@@ -2,21 +2,23 @@
    1. BIẾN MÀU VÀ RESET
    ========================= */
 :root {
-    --bg: #f4f6fb;
+    --bg: #f8fafc;
     --surface: #ffffff;
-    --text: #182033;
-    --muted: #718096;
-    --line: #e7eaf1;
-    --primary: #25332c;
-    --primary-dark: #465a54;
-    --danger: #e74c5b;
-    --success: #374d44;
-    --warning: #d88913;
-    --info: #2878d0;
-    --sidebar: #3d5e45;
-    --sidebar-muted: #9ca4bd;
+    --text: #111827;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --primary: #e11d48;
+    --primary-dark: #be123c;
+    --danger: #dc2626;
+    --success: #166534;
+    --warning: #92400e;
+    --info: #075985;
+    --sidebar: #111827;
+    --sidebar-muted: #d1d5db;
+    --primary-soft: #fff1f2;
+    --primary-border: #fecdd3;
     --radius: 14px;
-    --shadow: 0 8px 26px rgba(108, 133, 212, 0.07);
+    --shadow: 0 8px 26px rgba(15, 23, 42, 0.08);
 }
 
 * {
@@ -89,7 +91,7 @@ button {
     place-items: center;
     border-radius: 12px;
     color: #fff;
-    background: linear-gradient(135deg, #030204, #1c1a2d);
+    background: linear-gradient(135deg, var(--primary), #9f1239);
     font-size: 14px;
     font-weight: 800;
     letter-spacing: 0.04em;
@@ -125,18 +127,18 @@ button {
 
 .admin-nav a span {
     width: 22px;
-    color: #c4cae0;
+    color: #9ca3af;
     text-align: center;
 }
 
 .admin-nav a:hover,
 .admin-nav a.active {
     color: #fff;
-    background: rgba(108, 92, 231, 0.22);
+    background: rgba(225, 29, 72, 0.25);
 }
 
 .admin-nav a.active span {
-    color: #a89bff;
+    color: #fda4af;
 }
 
 .logout-form {
@@ -148,8 +150,8 @@ button {
     padding: 11px 13px;
     border: 0;
     border-radius: 10px;
-    color: #ffb9c0;
-    background: rgba(231, 76, 91, 0.1);
+    color: #fecaca;
+    background: rgba(225, 29, 72, 0.1);
     text-align: left;
 }
 
@@ -279,23 +281,23 @@ button {
 }
 
 .stat-icon.purple {
-    color: #201f24;
-    background: #eeeaff;
+    color: #111827;
+    background: #e5e7eb;
 }
 
 .stat-icon.blue {
-    color: #2672c7;
-    background: #e7f2ff;
+    color: #be123c;
+    background: #ffe4e6;
 }
 
 .stat-icon.orange {
-    color: #c87912;
-    background: #fff2de;
+    color: #9f1239;
+    background: #fff1f2;
 }
 
 .stat-icon.green {
-    color: #158a5f;
-    background: #def8ed;
+    color: #111827;
+    background: #f1f5f9;
 }
 
 .dashboard-grid,
@@ -326,7 +328,7 @@ td {
 
 th {
     color: var(--muted);
-    background: #fbfcfe;
+    background: #f8fafc;
     font-size: 12px;
     font-weight: 750;
     letter-spacing: 0.02em;
@@ -338,7 +340,7 @@ tbody tr:last-child td {
 }
 
 tbody tr:hover {
-    background: #fcfcff;
+    background: #fff1f2;
 }
 
 .text-right {
@@ -361,14 +363,14 @@ tbody tr:hover {
 .table-image {
     display: block;
     object-fit: cover;
-    background: #edf0f5;
+    background: #f1f5f9;
 }
 
 .image-placeholder {
     display: grid;
     place-items: center;
-    color: #9aa3b5;
-    background: #edf0f5;
+    color: #9ca3af;
+    background: #f1f5f9;
     font-size: 9px;
     font-weight: 800;
 }
@@ -379,7 +381,7 @@ tbody tr:hover {
     height: 55px;
     border-radius: 9px;
     object-fit: cover;
-    background: #edf0f5;
+    background: #f1f5f9;
 }
 
 .product-cell {
@@ -455,10 +457,10 @@ tbody tr:hover {
 
 .coupon-code {
     padding: 6px 9px;
-    border: 1px dashed #a997ff;
+    border: 1px dashed #fb7185;
     border-radius: 7px;
-    color: #5c49d0;
-    background: #f3f0ff;
+    color: #be123c;
+    background: #fff1f2;
     font-weight: 800;
 }
 
@@ -493,8 +495,14 @@ tbody tr:hover {
 
 .btn-light {
     border-color: var(--line);
-    color: #3e485e;
+    color: #111827;
     background: #fff;
+}
+
+.btn-light:hover {
+    border-color: var(--primary-border);
+    color: var(--primary-dark);
+    background: var(--primary-soft);
 }
 
 .btn-danger {
@@ -563,6 +571,67 @@ tbody tr:hover {
     border-color: #f4c2c7;
     color: #a92f3b;
     background: #fff0f2;
+}
+
+/* Phân trang danh sách sản phẩm Admin. */
+.pagination-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 22px;
+    border-top: 1px solid var(--line);
+}
+
+.pagination-summary {
+    margin: 0;
+    color: var(--muted);
+}
+
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.pagination-link {
+    display: inline-flex;
+    min-width: 36px;
+    height: 36px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 11px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text);
+    background: var(--surface);
+    font-weight: 700;
+    transition: 0.2s ease;
+}
+
+.pagination-link:hover {
+    border-color: var(--primary-border);
+    color: var(--primary-dark);
+    background: var(--primary-soft);
+}
+
+.pagination-link.active {
+    border-color: var(--primary);
+    color: #fff;
+    background: var(--primary);
+}
+
+.pagination-link.disabled {
+    color: #9ca3af;
+    background: #f1f5f9;
+    pointer-events: none;
+}
+
+.pagination-ellipsis {
+    padding: 0 4px;
+    color: var(--muted);
 }
 
 /* =========================
@@ -647,7 +716,7 @@ select,
 textarea {
     width: 100%;
     padding: 10px 12px;
-    border: 1px solid #dce0e9;
+    border: 1px solid #d1d5db;
     border-radius: 9px;
     color: var(--text);
     outline: none;
@@ -657,8 +726,8 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-    border-color: #9e92ed;
-    box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.1);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.1);
 }
 
 textarea {
@@ -668,7 +737,7 @@ textarea {
 
 input[type="file"] {
     padding: 8px;
-    background: #fafbfe;
+    background: #f8fafc;
 }
 
 .check-row {
@@ -774,8 +843,8 @@ input[type="file"] {
     place-items: center;
     padding: 24px;
     background:
-        radial-gradient(circle at top left, rgba(108, 92, 231, 0.2), transparent 35%),
-        #f4f6fb;
+        radial-gradient(circle at top left, rgba(225, 29, 72, 0.2), transparent 35%),
+        #f8fafc;
 }
 
 .login-card {
@@ -784,7 +853,7 @@ input[type="file"] {
     border: 1px solid var(--line);
     border-radius: 18px;
     background: #fff;
-    box-shadow: 0 18px 55px rgba(30, 42, 80, 0.12);
+    box-shadow: 0 18px 55px rgba(15, 23, 42, 0.15);
 }
 
 .login-brand {
@@ -813,8 +882,8 @@ input[type="file"] {
     margin-top: 20px;
     padding: 12px;
     border-radius: 9px;
-    color: #5e6575;
-    background: #f6f7fb;
+    color: #6b7280;
+    background: #fff1f2;
     font-size: 12px;
 }
 
@@ -881,6 +950,15 @@ input[type="file"] {
 
     .form-card {
         padding: 18px;
+    }
+
+    .pagination-footer {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .pagination {
+        justify-content: flex-start;
     }
 }
 

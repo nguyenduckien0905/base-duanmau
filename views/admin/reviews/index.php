@@ -11,6 +11,7 @@
                 <tr>
                     <th>Khách hàng</th>
                     <th>Sản phẩm</th>
+                    <th>Đơn mua</th>
                     <th>Số sao</th>
                     <th>Nội dung</th>
                     <th>Ngày đánh giá</th>
@@ -26,6 +27,15 @@
                             <small class="table-subtext"><?= e($review['email']) ?></small>
                         </td>
                         <td><?= e($review['product_name']) ?></td>
+                        <td>
+                            <?php if (!empty($review['order_id'])): ?>
+                                <a href="<?= e(url('admin/orders/show', ['id' => $review['order_id']])) ?>">
+                                    #<?= e($review['order_id']) ?>
+                                </a>
+                            <?php else: ?>
+                                <span class="badge badge-muted">Dữ liệu cũ</span>
+                            <?php endif; ?>
+                        </td>
                         <td><span class="stars"><?= str_repeat('★', (int) $review['rating']) ?></span></td>
                         <td class="comment-cell"><?= e($review['comment'] ?: 'Không có nội dung') ?></td>
                         <td><?= e(date('d/m/Y H:i', strtotime($review['created_at']))) ?></td>
@@ -59,7 +69,7 @@
 
                 <?php if (empty($reviews)): ?>
                     <tr>
-                        <td colspan="7" class="empty-state">Chưa có đánh giá.</td>
+                        <td colspan="8" class="empty-state">Chưa có đánh giá.</td>
                     </tr>
                 <?php endif; ?>
             </tbody>

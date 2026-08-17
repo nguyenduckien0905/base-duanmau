@@ -1,3 +1,20 @@
+<?php
+// Các tham số này được giữ lại khi nhân viên chuyển trang.
+$paginationParams = [];
+
+if ($keyword !== '') {
+    $paginationParams['keyword'] = $keyword;
+}
+
+if ($categoryId > 0) {
+    $paginationParams['category_id'] = $categoryId;
+}
+
+// Chỉ hiển thị một nhóm nhỏ số trang để danh sách 1.000 sản phẩm vẫn gọn.
+$startPage = max(1, $page - 2);
+$endPage = min($totalPages, $page + 2);
+?>
+
 <!-- Bộ lọc và nút thêm sản phẩm. -->
 <div class="toolbar toolbar-wrap">
     <form class="filter-form" action="<?= e(url('admin/products')) ?>" method="get">
@@ -125,4 +142,86 @@
             </tbody>
         </table>
     </div>
+
+    <?php if ($totalProducts > 0): ?>
+        <div class="pagination-footer">
+            <p class="pagination-summary">
+                Hiển thị <?= e($fromProduct) ?>–<?= e($toProduct) ?>
+                trong <?= e($totalProducts) ?> sản phẩm
+            </p>
+
+            <?php if ($totalPages > 1): ?>
+                <nav class="pagination" aria-label="Phân trang sản phẩm Admin">
+                    <?php if ($page > 1): ?>
+                        <a
+                            class="pagination-link"
+                            href="<?= e(url(
+                                'admin/products',
+                                array_merge($paginationParams, ['page' => $page - 1])
+                            )) ?>"
+                        >
+                            ‹ Trước
+                        </a>
+                    <?php else: ?>
+                        <span class="pagination-link disabled">‹ Trước</span>
+                    <?php endif; ?>
+
+                    <?php if ($startPage > 1): ?>
+                        <a
+                            class="pagination-link"
+                            href="<?= e(url(
+                                'admin/products',
+                                array_merge($paginationParams, ['page' => 1])
+                            )) ?>"
+                        >1</a>
+
+                        <?php if ($startPage > 2): ?>
+                            <span class="pagination-ellipsis">…</span>
+                        <?php endif; ?>
+                    <?php endif; ?>
+
+                    <?php for ($pageNumber = $startPage; $pageNumber <= $endPage; $pageNumber++): ?>
+                        <a
+                            class="pagination-link <?= $pageNumber === $page ? 'active' : '' ?>"
+                            href="<?= e(url(
+                                'admin/products',
+                                array_merge($paginationParams, ['page' => $pageNumber])
+                            )) ?>"
+                            <?= $pageNumber === $page ? 'aria-current="page"' : '' ?>
+                        >
+                            <?= e($pageNumber) ?>
+                        </a>
+                    <?php endfor; ?>
+
+                    <?php if ($endPage < $totalPages): ?>
+                        <?php if ($endPage < $totalPages - 1): ?>
+                            <span class="pagination-ellipsis">…</span>
+                        <?php endif; ?>
+
+                        <a
+                            class="pagination-link"
+                            href="<?= e(url(
+                                'admin/products',
+                                array_merge($paginationParams, ['page' => $totalPages])
+                            )) ?>"
+                        ><?= e($totalPages) ?></a>
+                    <?php endif; ?>
+
+                    <?php if ($page < $totalPages): ?>
+                        <a
+                            class="pagination-link"
+                            href="<?= e(url(
+                                'admin/products',
+                                array_merge($paginationParams, ['page' => $page + 1])
+                            )) ?>"
+                        >
+                            Sau ›
+                        </a>
+                    <?php else: ?>
+                        <span class="pagination-link disabled">Sau ›</span>
+                    <?php endif; ?>
+                </nav>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
 </div>

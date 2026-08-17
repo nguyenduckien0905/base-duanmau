@@ -8,8 +8,22 @@ class ProductModel extends BaseModel
     /**
      * Lấy danh sách sản phẩm, tổng kho biến thể và số biến thể đang bán.
      */
-    public function getAll(string $keyword = '', int $categoryId = 0): array
-    {
+    public function getAll(
+        string $keyword = '',
+        int $categoryId = 0,
+        int $limit = 20,
+        int $offset = 0
+    ): array {
+        // LIMIT và OFFSET được ép thành số nguyên an toàn trước khi ghép SQL.
+        $limit = max(1, min($limit, 100));
+        $offset = max(0, $offset);
+
+        // Dùng chung điều kiện với countAll() để tổng bản ghi luôn chính xác.
+        [$whereSql, $params] = $this->productFilters(
+            $keyword,
+            $categoryId
+        );
+
         // Subquery variant_summary giúp tránh GROUP BY toàn bộ cột products.
         $sql = 'SELECT products.*,
                        categories.name AS category_name,
@@ -30,27 +44,35 @@ class ProductModel extends BaseModel
                     GROUP BY product_id
                 ) AS variant_summary
                     ON variant_summary.product_id = products.product_id
-                WHERE 1 = 1';
+                ' . $whereSql;
 
-        // Mảng tham số dành cho PDO.
-        $params = [];
-
-        // Tìm sản phẩm theo tên.
-        if ($keyword !== '') {
-            $sql .= ' AND products.product_name LIKE :keyword';
-            $params['keyword'] = '%' . $keyword . '%';
-        }
-
-        // Lọc sản phẩm theo danh mục.
-        if ($categoryId > 0) {
-            $sql .= ' AND products.category_id = :category_id';
-            $params['category_id'] = $categoryId;
-        }
-
-        // Sản phẩm mới nhất hiển thị trước.
-        $sql .= ' ORDER BY products.product_id DESC';
+        // Chỉ lấy đúng số dòng của trang hiện tại từ database.
+        $sql .= ' ORDER BY products.product_id DESC
+                  LIMIT ' . $limit . ' OFFSET ' . $offset;
 
         return $this->all($sql, $params);
+    }
+
+    /**
+     * Đếm tổng sản phẩm theo cùng điều kiện tìm kiếm và danh mục.
+     */
+    public function countAll(string $keyword = '', int $categoryId = 0): int
+    {
+        [$whereSql, $params] = $this->productFilters(
+            $keyword,
+            $categoryId
+        );
+
+        $result = $this->first(
+            'SELECT COUNT(*) AS total
+             FROM products
+             INNER JOIN categories
+                ON categories.category_id = products.category_id
+             ' . $whereSql,
+            $params
+        );
+
+        return (int) ($result['total'] ?? 0);
     }
 
     /**
@@ -235,5 +257,28 @@ class ProductModel extends BaseModel
         }
 
         return $totalStock;
+    }
+
+    /**
+     * Tạo điều kiện dùng chung cho câu lấy dữ liệu và câu COUNT.
+     */
+    private function productFilters(
+        string $keyword,
+        int $categoryId
+    ): array {
+        $whereSql = 'WHERE 1 = 1';
+        $params = [];
+
+        if ($keyword !== '') {
+            $whereSql .= ' AND products.product_name LIKE :keyword';
+            $params['keyword'] = '%' . $keyword . '%';
+        }
+
+        if ($categoryId > 0) {
+            $whereSql .= ' AND products.category_id = :category_id';
+            $params['category_id'] = $categoryId;
+        }
+
+        return [$whereSql, $params];
     }
 }

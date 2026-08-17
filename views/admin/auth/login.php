@@ -21,12 +21,13 @@ $flash = getFlash();
     <!-- Khung đăng nhập ở giữa màn hình. -->
     <div class="login-card">
         <div class="login-brand">
-            <img style="width: 60px;" src="assets/uploads/admin/logo.jpg" alt="Logo">
-            <div>
-                <h1>Clothing Shop</h1>
-                <p>Đăng nhập khu vực quản trị</p>
-            </div>
+           <img style="width: 200px;" src="./assets/uploads/admin/logo_KD.png" alt="logo thương hiệu">
+           <span>
+            <p>Đăng Nhập Khu Vực Quản Trị</p>
+           </span>
+            
         </div>
+        
 
         <!-- Hiển thị thông báo từ session. -->
         <?php if ($flash): ?>
