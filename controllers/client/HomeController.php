@@ -2,7 +2,7 @@
 
 // File này nằm trong controllers/client vì chỉ xử lý giao diện người mua.
 // Khai báo controller chịu trách nhiệm xử lý trang chủ phía Client.
-class HomeController
+class ClientHomeController
 {
     // Thuộc tính lưu đối tượng model để controller có thể lấy dữ liệu sản phẩm.
     private ClientProductModel $productModel;

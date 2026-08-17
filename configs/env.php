@@ -1,7 +1,7 @@
 <?php
 
 // URL gốc của dự án trên XAMPP; sửa BaseExam thành tên thư mục dự án của bạn.
-define('BASE_URL', 'http://localhost/base-duanmau/');
+define('BASE_URL', 'http://localhost/Du_An_1/base-duanmau/');
 
 // Đường dẫn tuyệt đối tới thư mục gốc của dự án.
 define('PATH_ROOT', __DIR__ . '/../');

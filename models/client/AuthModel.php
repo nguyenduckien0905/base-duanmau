@@ -42,10 +42,11 @@ class ClientAuthModel extends BaseModel
     public function create(array $data): int
     {
         // role_id = 3 giúp tài khoản mới xuất hiện trong nhóm khách hàng ở Admin.
-       $sql = 'INSERT INTO users (
-            role_id,fullname, email, password,phone, avatar, status )
-             VALUES (
-             3, :fullname, :email, :password, :phone, NULL,  1)';
+        $sql = 'INSERT INTO users (
+                    role_id, fullname, email, password, phone, avatar, status
+                ) VALUES (
+                    3, :fullname, :email, :password, :phone, NULL, 1
+                )';
         // Chạy INSERT và trả số dòng được thêm.
         return $this->execute($sql, $data);
     }
@@ -62,8 +63,7 @@ class ClientAuthModel extends BaseModel
         return $this->execute(
             'UPDATE users
              SET fullname = :fullname,
-                 phone = :phone,
-                 address = :address
+                 phone = :phone
              WHERE user_id = :id AND role_id = 3',
             $data
         );

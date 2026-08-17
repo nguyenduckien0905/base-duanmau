@@ -4,7 +4,7 @@
  * Controller đăng ký, đăng nhập, đăng xuất
  * và cập nhật tài khoản khách hàng.
  */
-class AuthController
+class ClientAuthController
 {
     // Model thao tác với bảng users.
     private ClientAuthModel $model;
@@ -162,7 +162,7 @@ class AuthController
             PATH_VIEW . 'client/account/register.php';
 
         // Nạp layout Client.
-        require PATH_VIEW_CLIENT_MAIN;
+        require PATH_VIEW . 'client/layouts/master.php';
     }
 
     /**
@@ -282,7 +282,7 @@ class AuthController
             PATH_VIEW . 'client/account/login.php';
 
         // Nạp layout Client.
-        require PATH_VIEW_CLIENT_MAIN;
+        require PATH_VIEW . 'client/layouts/master.php';
     }
 
     /**

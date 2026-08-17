@@ -30,7 +30,7 @@
             <h3 class="product-name"><?= e($item['product_name']) ?></h3>
             <!-- formatPrice() đổi số thành định dạng tiền Việt Nam. -->
             <div class="product-price"><?= e(formatPrice($item['price'])) ?></div>
-             <?php if ((int) ($item['stock'] ?? 0) <= 0): ?>
+            <?php if ((int) ($item['stock'] ?? 0) <= 0): ?>
                 <span class="product-card-stock-out">Tạm hết hàng</span>
             <?php endif; ?>
         </div>
